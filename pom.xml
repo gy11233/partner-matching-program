@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.gy11233</groupId>
-    <artifactId>partner</artifactId>
+    <artifactId>partner-matching-program</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>yupao-backend</name>
-    <description>yupao-backend</description>
+    <name>partner-matching-program-backend</name>
+    <description>partner-matching-program-backend</description>
     <properties>
         <java.version>1.8</java.version>
     </properties>
