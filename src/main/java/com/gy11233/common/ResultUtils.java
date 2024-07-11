@@ -2,7 +2,7 @@ package com.gy11233.common;
 
 /**
  * 返回工具类
- *
+ * 对baseResponse进行封装调用
  */
 public class ResultUtils {
 

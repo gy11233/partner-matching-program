@@ -5,7 +5,7 @@ import lombok.Data;
 import java.io.Serializable;
 
 /**
- * 通用返回类
+ * 通用返回类 对返回格式进行统一
  *
  */
 @Data
@@ -31,7 +31,6 @@ public class BaseResponse<T> implements Serializable {
      */
     private String description;
 
-    // https://t.zsxq.com/0emozsIJh
     public BaseResponse(int code, T data, String message, String description) {
         this.code = code;
         this.data = data;
