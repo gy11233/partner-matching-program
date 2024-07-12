@@ -31,7 +31,9 @@
    1. 标签表
    2. 用户表
 2. 开发后端 根据标签搜索用户
-
+3. 后端整合Swagger+Knife4j接口文档
+4. 存量用户信息导入
+5. 前后端联调
 
 
 ## 模块实现
@@ -122,6 +124,25 @@ service实现 `searchUsersByTags`
 #### 用户注册 登陆
 
 
+----
+### 后端整合Swagger+Knife4j接口文档
+每条接口内容
+- 请求参数
+- 响应参数
+  - 错误码
+- 接口地址
+- 接口名称
+- 请求类型
+- 请求格式
+- 备注
+
+swagger https://blog.csdn.net/hadues/article/details/123753888
+1. maven中引入
+2. 配置config下文件
+3. 配置需要生成接口文档的包
+4. 配置application.yml(因为版本兼容带来的问题)
+
+
 
 ----
 1. 连接池用的jdbc 可以之后替换成druid连接池
@@ -130,5 +151,6 @@ service实现 `searchUsersByTags`
    - 如果参数不可以分析，并且数据库连接足够内存足够，可以并发查询，谁先返回用哪个
    - sql与内存结合，比如用sql先过滤到一部分tag
    - **之后可以多放数据选择合适的**
-
+3. java8 parallelStream 去了解一下
+4. 
 

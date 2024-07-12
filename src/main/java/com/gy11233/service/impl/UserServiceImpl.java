@@ -79,14 +79,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
         // 账户不能重复
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("userAccount", userAccount);
+        queryWrapper.eq("user_account", userAccount);
         long count = userMapper.selectCount(queryWrapper);
         if (count > 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
         }
         // 星球编号不能重复
         queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("planetCode", planetCode);
+        queryWrapper.eq("planet_code", planetCode);
         count = userMapper.selectCount(queryWrapper);
         if (count > 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "编号重复");
@@ -105,7 +105,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return user.getId();
     }
 
-    // [加入星球](https://www.code-nav.cn/) 从 0 到 1 项目实战，经验拉满！10+ 原创项目手把手教程、7 日项目提升训练营、60+ 编程经验分享直播、1000+ 项目经验笔记
 
     /**
      * 用户登录
@@ -137,8 +136,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
         // 查询用户是否存在
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("userAccount", userAccount);
-        queryWrapper.eq("userPassword", encryptPassword);
+        queryWrapper.eq("user_account", userAccount);
+        queryWrapper.eq("user_password", encryptPassword);
         User user = userMapper.selectOne(queryWrapper);
         // 用户不存在
         if (user == null) {
@@ -191,34 +190,52 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return 1;
     }
 
+    /**
+     * 根据标签搜索用户 用sql
+     * @param tagNameList
+     * @return
+     */
+    @Deprecated
+    public List<User> searchUserByTagsBySQL(List<String> tagNameList) {
+        if (CollectionUtils.isEmpty(tagNameList)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
 
+        // 用 like "%java%" and like 查询
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        for (String tagName : tagNameList) {
+            userQueryWrapper = userQueryWrapper.like("tags", tagName);
+        }
+//        List<User> users = userMapper.selectList(userQueryWrapper);
+//        users.forEach(user -> {
+//            getSafetyUser(user);
+//        });
+        List<User> users = userMapper.selectList(userQueryWrapper);
+//        users.forEach(this::getSafetyUser);
+        return users.stream().map(this::getSafetyUser).collect(Collectors.toList());
+    }
+
+    /**
+     * 根据标签搜索用户 内存方法
+     * @param tagNameList
+     * @return
+     */
     @Override
     public List<User> searchUserByTags(List<String> tagNameList){
         if (CollectionUtils.isEmpty(tagNameList)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
 
-//        // 用 like "%java%" and like 查询
-//        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
-//        for (String tagName : tagNameList) {
-//            userQueryWrapper = userQueryWrapper.like("tags", tagName);
-//        }
-////        List<User> users = userMapper.selectList(userQueryWrapper);
-////        users.forEach(user -> {
-////            getSafetyUser(user);
-////        });
-//        List<User> users = userMapper.selectList(userQueryWrapper);
-////        users.forEach(this::getSafetyUser);
-//        return users.stream().map(this::getSafetyUser).collect(Collectors.toList());
-
         // 用内存的方式查询
         QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
         List<User> users = userMapper.selectList(userQueryWrapper);
         return users.stream().filter(user -> { //过滤器
+//        return users.parallelStream().filter(user -> {  // 并发的方式
             String tagsStr = user.getTags();
             Gson gson = new Gson();
             Set<String> tagSet = gson.fromJson(tagsStr, new TypeToken<Set<String>>() {
             }.getType());
+            tagSet = Optional.ofNullable(tagSet).orElse(new HashSet<>());
             for (String tagName : tagNameList) {
                 if (!tagSet.contains(tagName)) return false;
             }
