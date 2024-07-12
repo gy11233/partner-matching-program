@@ -138,13 +138,48 @@ service实现 `searchUsersByTags`
 
 swagger https://blog.csdn.net/hadues/article/details/123753888
 1. maven中引入
-2. 配置config下文件
+2. 配置config下文件 在SwaggerConfig类上加@Profile({"dev", "test"})注解 不暴露接口给外部
 3. 配置需要生成接口文档的包
 4. 配置application.yml(因为版本兼容带来的问题)
+
+### 爬虫提取数据
+1. 分析原网站获取数据的接口
+    ```shell
+    $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    Invoke-WebRequest -UseBasicParsing -Uri "https://api.zsxq.com/v2/hashtags/48844541281228/topics?count=20" `
+    -WebSession $session `
+    -Headers @{
+    "authority"="api.zsxq.com"
+      "method"="GET"
+      "path"="/v2/hashtags/48844541281228/topics?count=20"
+      "scheme"="https"
+      "accept"="application/json, text/plain, */*"
+      "accept-encoding"="gzip, deflate, br, zstd"
+      "accept-language"="zh-CN,zh;q=0.9"
+      "origin"="https://wx.zsxq.com"
+      "priority"="u=1, i"
+      "referer"="https://wx.zsxq.com/"
+      "sec-ch-ua"="`"Not/A)Brand`";v=`"8`", `"Chromium`";v=`"126`", `"Google Chrome`";v=`"126`""
+      "sec-ch-ua-mobile"="?0"
+      "sec-ch-ua-platform"="`"macOS`""
+      "sec-fetch-dest"="empty"
+      "sec-fetch-mode"="cors"
+      "sec-fetch-site"="same-site"
+      "x-request-id"="775fe6b1e-87a2-3190-f1c4-805e2e79cba"
+      "x-signature"="596b39afe68dfb11a7608d34e2ebd81ea523d54e"
+      "x-timestamp"="1720780935"
+      "x-version"="2.58.0"
+    }
+    ```
+2. 程序调用接口 
+
+3. 数据清洗后写入数据库
+
 
 
 
 ----
+## 改进和思考
 1. 连接池用的jdbc 可以之后替换成druid连接池
 2. 查询的两种方式 内存和sql 数据量大的时候实际看哪个快用哪个 如果接近： 
    - 如果参数可以分析，根据用户的参数选择查询方式，比如标签数 大于某个值内存更快
