@@ -10,6 +10,7 @@ import com.gy11233.model.domain.request.UserLoginRequest;
 import com.gy11233.model.domain.request.UserRegisterRequest;
 import com.gy11233.service.UserService;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -26,6 +27,8 @@ import static com.gy11233.contant.UserConstant.USER_LOGIN_STATE;
  */
 @RestController
 @RequestMapping("/user")
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials="true") // 解决跨域
+//@CrossOrigin // 解决跨域
 public class UserController {
 
     @Resource
@@ -123,6 +126,16 @@ public class UserController {
         List<User> userList = userService.list(queryWrapper);
         List<User> list = userList.stream().map(user -> userService.getSafetyUser(user)).collect(Collectors.toList());
         return ResultUtils.success(list);
+    }
+
+    @GetMapping("/search/tags")
+    public BaseResponse<List<User>> searchUserByTags(@RequestParam(required = false) List<String> tagsNameList){
+        if(CollectionUtils.isEmpty(tagsNameList)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        List<User> userList = userService.searchUserByTags(tagsNameList);
+        return ResultUtils.success(userList);
+
     }
 
     @PostMapping("/delete")

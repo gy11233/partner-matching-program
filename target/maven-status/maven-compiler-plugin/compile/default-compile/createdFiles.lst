@@ -1,11 +1,13 @@
 com/gy11233/common/ResultUtils.class
 com/gy11233/exception/BusinessException.class
-com/gy11233/UserCenterApplication.class
 com/gy11233/exception/GlobalExceptionHandler.class
+com/gy11233/config/SwaggerConfig.class
 com/gy11233/controller/UserController.class
 com/gy11233/common/ErrorCode.class
 com/gy11233/common/BaseResponse.class
 com/gy11233/service/UserService.class
+com/gy11233/PartnerApplication.class
+com/gy11233/service/impl/UserServiceImpl$1.class
 com/gy11233/contant/UserConstant.class
 com/gy11233/model/domain/request/UserLoginRequest.class
 com/gy11233/model/domain/User.class

@@ -33,7 +33,12 @@
 2. 开发后端 根据标签搜索用户
 3. 后端整合Swagger+Knife4j接口文档
 4. 存量用户信息导入
-5. 前后端联调
+5. 前后端联调 使用@CrossOrigin注解
+
+### 第二期任务
+1. 页面和功能开发 前端
+2. 改造用户中心，把单机登录改成分布式session登录
+3. 标签的整理、细化和优化
 
 
 ## 模块实现
@@ -121,7 +126,36 @@ service实现 `searchUsersByTags`
 - 用sql的方式实现
 - 用内存的方式实现（可以通过并发）
 
-#### 用户注册 登陆
+#### 用户注册 登陆 （解决分布式登录问题）
+模拟分布式登录：
+```shell
+java -jar 项目jar包 --server.port=8081
+```
+##### 服务器A登录后，请求发送到服务器B不认识用户
+用户在A登录，所以session存储在了A中，请求B时，B没有用户信息
+解决方案：共享存储，把用户信息放在**公共存储**中
+如何共享存储？
+1. mysql
+2. redis ✅ 用户信息读取/是否登录的判断及其**频繁** 基于内存 读写性能很高 单机qps 5w-10w
+3. 文件服务器 ceph
+
+##### redis安装与使用
+> https://blog.csdn.net/realize_dream/article/details/106227622
+
+版本 redis 7.2.5 
+管理工具 quick redis 
+
+基本命令:
+```shell
+brew services start redis
+redis-cli
+redis-cli -h 127.0.0.1 -p 6379
+redis-cli shutdown
+```
+引入mvn包 
+配置application.yml
+- 配置redis
+- 配置session存储方式为redis store-type: redis 从redis中读写session
 
 
 ----
@@ -187,5 +221,9 @@ swagger https://blog.csdn.net/hadues/article/details/123753888
    - sql与内存结合，比如用sql先过滤到一部分tag
    - **之后可以多放数据选择合适的**
 3. java8 parallelStream 去了解一下
-4. 
-
+4. session 和 cookie区别
+5. 对比之前request.getSession().setAttribute(USER_LOGIN_STATE, safetyUser)
+的实现方式和换成redis存储的方式
+6. jwt和session比较 https://www.cnblogs.com/ls1519/p/13428380.html 
+7. 设置用户权限的方式  spring security 没必要用 细粒度权限控制
+8. 
