@@ -55,6 +55,7 @@ public interface UserService extends IService<User> {
 
     int updateUser(User user, User currentUser);
 
+    List<User> recommendUsers(long pageSize, long pageNum, User user);
 
     /**
      * 是否为管理员

@@ -46,6 +46,10 @@
    - 导入数据 尽量一个量级一个量级增加 分批导入 写程序导入 更可控
 3. 优化主页的性能（缓存+定时任务）
 
+### 第四期任务
+1. 分布式锁
+2. 组队功能
+
 
 ## 模块实现
 
@@ -190,9 +194,79 @@ swagger https://blog.csdn.net/hadues/article/details/123753888
 ### 批量导入数据
 1. 写程序导入
 2. 用mybatis-plus的批量导入加速
-3. 
+3. 数据量大了之后采用分页操作显示主页信息
+
+### 主页性能优化
+80w数据用了分页之后还是0.2s 有卡顿，如果超出1s就是比较慢的 数据库慢 
+预先把数据查出来放到一个更快读取的地方（缓存）
+
+预加载 定时更新缓存  分布式锁 控制同一时间只有一台及其去执行定时任务
+
+##### 数据查询慢怎么办？用缓存
+缓存：提前把数据取出来保存好，通常保存到读写更快的介质中，比如内存
+
+**缓存的实现**
+- redis 分布式
+- memcached 分布式
+- etcd  云原生架构的分布式存储 存储配置 扩容能力强
+------
+- ehcache 单机
+- 本地缓存 java内存map
+- caffeine java内存缓存 高性能
+- google guava
+单机缓存 在多服务器的时候可能出现数据不一致的情况
+
+**redis**
+> NoSQL数据库
+
+key-value存储系统
+
+**java里的实现方式**
+- spring data redis (推荐)
+  - spring data一组通用的数据访问框架，定义了增删改查的接口
+  - spring data redis是针对redis的实现类
+- jedis
+- redisson
+
+###### 具体实现
+1. **设计缓存key**
+    systemId:moduleId:func:<options> (不和别人冲突)
+    
+    partner:user:recommend:userId 
+2. **实现redis缓存存储** 
+   - 如果没有登录的直接用default，登录的用户记录自己的缓存（之后可以扩展成有匹配的推荐）
+   - 效果：没有用redis之前加载时间200ms左右 改进后第一个用户200ms，之后的用户20ms左右
+   - 问题：第一个用户还是很慢
+
+#### 缓存预热
+###### 缓存预热优缺点
+- 优点
+  - 让用户始终访问很快
+- 缺点
+  - 增加开发成本
+  - 预热的时间和时机如果错了，可能缓存的数据不对
+  - 需要占用额外空间
+###### 怎么缓存预热
+- 定时
+  - 启动类@EnableScheduling 需要定时执行的方法添加@Scheduled，指定corn表达式
+- 模拟触发（手动触发）
+- 注意的点
+  - 缓存预热的意义 （新增少，总用户多）
+  - 缓存的空间不能占有太大，要预留给其他缓存空间
+  - 预热周期 1/天
+###### 定时任务实现
+1. spring scheduler  springboot 默认整合
+2. quartz 独立于Spring的定时任务
+3. XX-job ==可以放在后续实现和源码阅读任务==
 
 
+#### 分布式锁 控制定时任务的执行
+可能出现脏数据（重复插入） 浪累资源
+
+
+
+
+> 分析优缺点要从整个项目从0-1进行分析
 
 
 ----
@@ -205,8 +279,10 @@ swagger https://blog.csdn.net/hadues/article/details/123753888
    - **之后可以多放数据选择合适的**
 3. java8 parallelStream 去了解一下
 4. session 和 cookie区别
-5. 对比之前request.getSession().setAttribute(USER_LOGIN_STATE, safetyUser)
+5. session存在redis中什么时候进行删除清理库  **目前解决方案：设置过期时间解决 但是还未解决**
+6. 对比之前request.getSession().setAttribute(USER_LOGIN_STATE, safetyUser)
 的实现方式和换成redis存储的方式
-6. jwt和session比较 https://www.cnblogs.com/ls1519/p/13428380.html 
-7. 设置用户权限的方式  spring security 没必要用 细粒度权限控制
-8. 
+7. jwt和session比较 https://www.cnblogs.com/ls1519/p/13428380.html 
+8. 设置用户权限的方式  spring security 没必要用 细粒度权限控制
+9. 主页推荐 是直接预先算好还是实时计算
+10. 对比spring redis  jedis  redisson(分布式) 

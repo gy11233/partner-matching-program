@@ -1,6 +1,7 @@
 package com.gy11233.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -11,12 +12,15 @@ import com.gy11233.service.UserService;
 import com.gy11233.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,6 +41,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     @Resource
     private UserMapper userMapper;
 
+    @Resource
+    private RedisTemplate redisTemplate;
 
     /**
      * 盐值，混淆密码
@@ -263,6 +269,47 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             throw new BusinessException(ErrorCode.NO_AUTH);
         }
         return userMapper.updateById(user);
+    }
+
+    @Override
+    public List<User> recommendUsers(long pageSize, long pageNum, User user) {
+        // 如果user没有登录 key设置为默认的结果
+        String key;
+        if (user == null) {
+            key = "partner:user:recommend:default";
+        }
+        // 如果登录且合法，设置成id
+        else{
+            // 获取修改用户id
+            long id = user.getId();
+            // 判断id合法
+            if (id <= 0) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR);
+            }
+            // 判断id对用的用户是不是存在
+            User userOld = userMapper.selectById(id);
+            if (userOld == null) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR);
+            }
+            key = String.format("partner:user:recommend:%s", id);
+        }
+
+        ValueOperations<String, Object> operations = redisTemplate.opsForValue();
+        Page<User> page = (Page<User>)operations.get(key);
+        // 有缓存直接返回缓存
+        if (page != null) {
+            return page.getRecords().stream().map(this::getSafetyUser).collect(Collectors.toList());
+        }
+        // 没有缓存查询并加入缓存
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        Page<User> list = page(new Page<>(pageNum, pageSize), queryWrapper);
+        try {
+            operations.set(key, list, 100000, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            log.error("redis set key error", e);
+        }
+        List<User> userList = list.getRecords();
+        return userList.stream().map(this::getSafetyUser).collect(Collectors.toList());
     }
 
     @Override

@@ -175,11 +175,9 @@ public class UserController {
 
     @GetMapping("/recommend")
     public BaseResponse<List<User>> recommendUsers(long pageSize, long pageNum, HttpServletRequest request){
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        Page<User> list = userService.page(new Page<>(pageNum, pageSize), queryWrapper);
-        List<User> userList = list.getRecords();
-        List<User> collect = userList.stream().map(user -> userService.getSafetyUser(user)).collect(Collectors.toList());
-        return ResultUtils.success(userList);
+        // 通过userId查看redis中是否有对应的信息
+        User userObj = (User)request.getSession().getAttribute(USER_LOGIN_STATE);
+        return ResultUtils.success(userService.recommendUsers(pageSize, pageNum, userObj));
 
     }
 
