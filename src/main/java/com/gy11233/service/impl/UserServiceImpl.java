@@ -20,6 +20,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.gy11233.contant.UserConstant.ADMIN_ROLE;
 import static com.gy11233.contant.UserConstant.USER_LOGIN_STATE;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,7 +37,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     @Resource
     private UserMapper userMapper;
 
-    // https://www.code-nav.cn/
 
     /**
      * 盐值，混淆密码
@@ -243,6 +243,40 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             }
             return true;
         }).map(this::getSafetyUser).collect(Collectors.toList());
+    }
+
+    @Override
+    public int updateUser(User user, User currentUser) {
+        // 获取修改用户id
+        long id = user.getId();
+        // 判断id合法
+        if (id <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 判断id对用的用户是不是存在
+        User userOld = userMapper.selectById(id);
+        if (userOld == null) {
+           throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 如果不是管理员 也不是当前用户 -> 不能修改信息
+        if (!isAdmin(currentUser) && id!=currentUser.getId()) {
+            throw new BusinessException(ErrorCode.NO_AUTH);
+        }
+        return userMapper.updateById(user);
+    }
+
+    @Override
+    public boolean isAdmin(HttpServletRequest request) {
+        // 仅管理员可查询
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        User user = (User) userObj;
+        return user != null && user.getUserRole() == ADMIN_ROLE;
+    }
+
+    @Override
+    public boolean isAdmin(User user) {
+        // 仅管理员可查询
+        return user != null && user.getUserRole() == ADMIN_ROLE;
     }
 
 }

@@ -38,7 +38,13 @@
 ### 第二期任务
 1. 页面和功能开发 前端
 2. 改造用户中心，把单机登录改成分布式session登录
-3. 标签的整理、细化和优化
+
+### 第三期任务
+1. 用户修改页面的后端开发
+2. 开发主页（默认推荐和自己兴趣相当的用户）
+   - 开发/user/recommend后端接口
+   - 导入数据 尽量一个量级一个量级增加 分批导入 写程序导入 更可控
+3. 优化主页的性能（缓存+定时任务）
 
 
 ## 模块实现
@@ -157,6 +163,11 @@ redis-cli shutdown
 - 配置redis
 - 配置session存储方式为redis store-type: redis 从redis中读写session
 
+#### 修改用户信息
+1. 判断参数是否为空
+23可以写到service层
+2. 校验权限
+3. 触发更新
 
 ----
 ### 后端整合Swagger+Knife4j接口文档
@@ -176,38 +187,10 @@ swagger https://blog.csdn.net/hadues/article/details/123753888
 3. 配置需要生成接口文档的包
 4. 配置application.yml(因为版本兼容带来的问题)
 
-### 爬虫提取数据
-1. 分析原网站获取数据的接口
-    ```shell
-    $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    Invoke-WebRequest -UseBasicParsing -Uri "https://api.zsxq.com/v2/hashtags/48844541281228/topics?count=20" `
-    -WebSession $session `
-    -Headers @{
-    "authority"="api.zsxq.com"
-      "method"="GET"
-      "path"="/v2/hashtags/48844541281228/topics?count=20"
-      "scheme"="https"
-      "accept"="application/json, text/plain, */*"
-      "accept-encoding"="gzip, deflate, br, zstd"
-      "accept-language"="zh-CN,zh;q=0.9"
-      "origin"="https://wx.zsxq.com"
-      "priority"="u=1, i"
-      "referer"="https://wx.zsxq.com/"
-      "sec-ch-ua"="`"Not/A)Brand`";v=`"8`", `"Chromium`";v=`"126`", `"Google Chrome`";v=`"126`""
-      "sec-ch-ua-mobile"="?0"
-      "sec-ch-ua-platform"="`"macOS`""
-      "sec-fetch-dest"="empty"
-      "sec-fetch-mode"="cors"
-      "sec-fetch-site"="same-site"
-      "x-request-id"="775fe6b1e-87a2-3190-f1c4-805e2e79cba"
-      "x-signature"="596b39afe68dfb11a7608d34e2ebd81ea523d54e"
-      "x-timestamp"="1720780935"
-      "x-version"="2.58.0"
-    }
-    ```
-2. 程序调用接口 
-
-3. 数据清洗后写入数据库
+### 批量导入数据
+1. 写程序导入
+2. 用mybatis-plus的批量导入加速
+3. 
 
 
 
