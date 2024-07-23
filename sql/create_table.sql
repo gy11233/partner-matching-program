@@ -8,7 +8,7 @@ partner;
 create table user
 (
     id           bigint auto_increment comment 'id' primary key,
-    username     varchar(256) null comment '用户昵称',
+    name     varchar(256) null comment '用户昵称',
     user_account  varchar(256) null comment '账号',
     avatar_url    varchar(1024) null comment '用户头像',
     gender       tinyint null comment '性别',
@@ -50,3 +50,45 @@ VALUES ('lily', '123', 'https://himg.bdimg.com/sys/portraitn/item/public.1.e137c
         null, 'b0dd3697a192885d7c055db46155b26a', null, null, 0, '2024-03-06 14:14:22', '2024-03-06 14:39:37', 0, 1, '1', '["java","c++","python"]');
 
 select * from partner.user;
+
+
+
+
+use
+    partner;
+
+-- 队伍表
+create table team
+(
+    id           bigint auto_increment comment 'id' primary key,
+    name     varchar(256) null comment '队伍名称',
+    description    varchar(1024) null comment '队伍描述',
+    max_num   int      default 1 not null comment '最大人数',
+    expire_time   datetime   null comment '过期时间',
+    user_id           bigint not null  comment '创建人id',
+    status   int      default 0 not null comment '状态 0 - 公开 1-私有 2-加密',
+    password varchar(512)       null comment '队伍密码',
+    create_time   datetime default CURRENT_TIMESTAMP null comment '创建时间',
+    update_time   datetime default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    is_delete     tinyint  default 0 not null comment '是否删除'
+
+) comment '队伍';
+
+
+-- 队伍-用户 关系表
+create table user_team
+(
+    id           bigint auto_increment comment 'id' primary key,
+    user_id           bigint not null  comment '用户id',
+    team_id           bigint not null  comment '队伍id',
+    join_time   datetime  null comment '加入时间',
+    create_time   datetime default CURRENT_TIMESTAMP null comment '创建时间',
+    update_time   datetime default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    is_delete     tinyint  default 0 not null comment '是否删除'
+
+) comment '队伍-用户关系表';
+
+
+
+
+

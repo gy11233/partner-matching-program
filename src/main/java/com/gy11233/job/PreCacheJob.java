@@ -34,7 +34,7 @@ public class PreCacheJob {
 
     List<Long> importantUsers = Arrays.asList(1L, 2L, 3L, 8L);
     // 每天执行
-    @Scheduled(cron = "0 37 17 * * *")
+    @Scheduled(cron = "0 58 23 * * *")
     public void DoPreCacheJob(){
 
         RLock lock = redissonClient.getLock("partner:precachejob:docache:lock");
