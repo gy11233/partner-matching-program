@@ -21,6 +21,7 @@ spring:
   redis:
     port: 6379
     database: 0
+    redissonDB: 1
     host: 127.0.0.1
 server:
   port: 8080
