@@ -3,6 +3,12 @@ package com.gy11233.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.gy11233.model.domain.Team;
 import com.gy11233.model.domain.User;
+import com.gy11233.model.dto.TeamQuery;
+import com.gy11233.model.request.TeamJoinRequest;
+import com.gy11233.model.request.TeamUpdateRequest;
+import com.gy11233.model.vo.TeamUserVO;
+
+import java.util.List;
 
 /**
 * @author guoying
@@ -11,4 +17,10 @@ import com.gy11233.model.domain.User;
 */
 public interface TeamService extends IService<Team> {
     long addTeam(Team team, User loginUser);
+
+    List<TeamUserVO> listTeams(TeamQuery teamQuery, Boolean isAdmin);
+
+    boolean updateTeam(TeamUpdateRequest team, User loginUser);
+
+    boolean joinTeam(TeamJoinRequest teamJoinRequest, User user);
 }

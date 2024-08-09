@@ -1,22 +1,19 @@
-package com.gy11233.model.domain;
+package com.gy11233.model.vo;
 
-import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 队伍
- * @TableName team
+ * 队伍和用户信息封装类
  */
-@TableName(value ="team")
 @Data
-public class Team implements Serializable {
+public class TeamUserVO implements Serializable {
+    private static final long serialVersionUID = -5121272425339577342L;
     /**
      * id
      */
-    @TableId(type = IdType.AUTO)
     private Long id;
 
     /**
@@ -49,10 +46,6 @@ public class Team implements Serializable {
      */
     private Integer status;
 
-    /**
-     * 队伍密码
-     */
-    private String password;
 
     /**
      * 创建时间
@@ -65,11 +58,8 @@ public class Team implements Serializable {
     private Date updateTime;
 
     /**
-     * 是否删除
+     * 创建用户信息
      */
-    @TableLogic
-    private Integer isDelete;
+    UserVO createUser;
 
-    @TableField(exist = false)
-    private static final long serialVersionUID = 1L;
 }

@@ -10,6 +10,9 @@ import com.gy11233.model.domain.Team;
 import com.gy11233.model.domain.User;
 import com.gy11233.model.dto.TeamQuery;
 import com.gy11233.model.request.TeamAddRequest;
+import com.gy11233.model.request.TeamJoinRequest;
+import com.gy11233.model.request.TeamUpdateRequest;
+import com.gy11233.model.vo.TeamUserVO;
 import com.gy11233.service.TeamService;
 
 import com.gy11233.service.UserService;
@@ -66,11 +69,14 @@ public class TeamController {
      * 更改队伍
      */
     @PostMapping("/updata")
-    public BaseResponse<Boolean> updateTeam(@RequestBody Team team) {
+    public BaseResponse<Boolean> updateTeam(@RequestBody TeamUpdateRequest team, HttpServletRequest request) {
         if (team == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        boolean update = teamService.updateById(team);
+
+        User loginUser = userService.getLoginUser(request);
+
+        boolean update = teamService.updateTeam(team, loginUser);
         if (!update) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "更新失败");
         }
@@ -93,22 +99,21 @@ public class TeamController {
     }
 
     /**
-     * 获取用户列表
+     * 获取队伍列表
      */
+
     @GetMapping("/list")
-    public BaseResponse<List<Team>> listTeam(TeamQuery teamQuery) {
+    public BaseResponse<List<TeamUserVO>> listTeam(TeamQuery teamQuery, HttpServletRequest request) {
         if (teamQuery == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        Team team = new Team();
-        BeanUtils.copyProperties(teamQuery, team);
-        QueryWrapper<Team> queryWrapper = new QueryWrapper<>(team);
-        List<Team> list = teamService.list(queryWrapper);
+        boolean isAdmin = userService.isAdmin(request);
+        List<TeamUserVO> list = teamService.listTeams(teamQuery, isAdmin);
         return ResultUtils.success(list);
     }
 
     /**
-     * 根据分页获取用户列表
+     * 根据分页获取队伍列表
      */
     @GetMapping("/list/page")
     public BaseResponse<Page<Team>> pageTeam(TeamQuery teamQuery) {
@@ -125,6 +130,16 @@ public class TeamController {
     }
 
 
+    @PostMapping("/join")
+    public BaseResponse<Boolean> joinTeam(TeamJoinRequest teamJoinRequest, HttpServletRequest request) {
+        if (teamJoinRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User safetyUser = userService.getLoginUser(request);
+
+        boolean result = teamService.joinTeam(teamJoinRequest, safetyUser);
+        return ResultUtils.success(result);
+    }
 
 
 
