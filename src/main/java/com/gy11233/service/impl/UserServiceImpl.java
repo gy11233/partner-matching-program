@@ -326,5 +326,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return user != null && user.getUserRole() == ADMIN_ROLE;
     }
 
+
+    @Override
+    public User getLoginUser(HttpServletRequest request) {
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        User user = (User) userObj;
+        if (user == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN);
+        }
+        return user;
+    }
 }
 

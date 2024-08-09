@@ -1,7 +1,7 @@
 package com.gy11233.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import generator.domain.UserTeam;
+import com.gy11233.model.domain.UserTeam;
 
 /**
 * @author guoying

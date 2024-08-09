@@ -1,14 +1,13 @@
 package com.gy11233.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gy11233.common.BaseResponse;
 import com.gy11233.common.ErrorCode;
 import com.gy11233.common.ResultUtils;
 import com.gy11233.exception.BusinessException;
 import com.gy11233.model.domain.User;
-import com.gy11233.model.domain.request.UserLoginRequest;
-import com.gy11233.model.domain.request.UserRegisterRequest;
+import com.gy11233.model.request.UserLoginRequest;
+import com.gy11233.model.request.UserRegisterRequest;
 import com.gy11233.service.UserService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -19,7 +18,6 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.gy11233.contant.UserConstant.ADMIN_ROLE;
 import static com.gy11233.contant.UserConstant.USER_LOGIN_STATE;
 
 /**

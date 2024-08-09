@@ -1,7 +1,8 @@
 package com.gy11233.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import generator.domain.Team;
+import com.gy11233.model.domain.Team;
+import com.gy11233.model.domain.User;
 
 /**
 * @author guoying
@@ -9,5 +10,5 @@ import generator.domain.Team;
 * @createDate 2024-07-23 20:59:29
 */
 public interface TeamService extends IService<Team> {
-
+    long addTeam(Team team, User loginUser);
 }
