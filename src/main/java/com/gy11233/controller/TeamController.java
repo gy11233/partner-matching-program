@@ -11,6 +11,7 @@ import com.gy11233.model.domain.User;
 import com.gy11233.model.dto.TeamQuery;
 import com.gy11233.model.request.TeamAddRequest;
 import com.gy11233.model.request.TeamJoinRequest;
+import com.gy11233.model.request.TeamQuitRequest;
 import com.gy11233.model.request.TeamUpdateRequest;
 import com.gy11233.model.vo.TeamUserVO;
 import com.gy11233.service.TeamService;
@@ -54,11 +55,12 @@ public class TeamController {
      * 删除队伍
      */
     @PostMapping("/delete")
-    public BaseResponse<Boolean> deleteTeam(@RequestBody Long id) {
-        if (id <= 0) {
+    public BaseResponse<Boolean> deleteTeam(Long teamId, HttpServletRequest request) {
+        if (teamId ==  null || teamId <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        boolean remove = teamService.removeById(id);
+        User safetyUser = userService.getLoginUser(request);
+        boolean remove = teamService.deleteTeam(teamId, safetyUser);
         if (!remove) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "删除失败");
         }
@@ -68,7 +70,7 @@ public class TeamController {
     /**
      * 更改队伍
      */
-    @PostMapping("/updata")
+    @PostMapping("/update")
     public BaseResponse<Boolean> updateTeam(@RequestBody TeamUpdateRequest team, HttpServletRequest request) {
         if (team == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -84,7 +86,7 @@ public class TeamController {
     }
 
     /**
-     * 根据id搜索
+     * 根据id搜索队伍
      */
     @GetMapping("/get")
     public BaseResponse<Team> getTeam(long id) {
@@ -99,7 +101,7 @@ public class TeamController {
     }
 
     /**
-     * 获取队伍列表
+     * 获取队伍列表 可以根据分页获取或者直接使用默认分页
      */
 
     @GetMapping("/list")
@@ -112,24 +114,29 @@ public class TeamController {
         return ResultUtils.success(list);
     }
 
+//    /**
+//     * 根据分页获取队伍列表
+//     */
+//    @GetMapping("/list/page")
+//    public BaseResponse<Page<Team>> pageTeam(TeamQuery teamQuery) {
+//        if (teamQuery == null) {
+//            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+//        }
+//        int pageNum = teamQuery.getPageNum();
+//        int pageSize = teamQuery.getPageSize();
+//        Team team = new Team();
+//        BeanUtils.copyProperties(teamQuery, team);
+//        QueryWrapper<Team> queryWrapper = new QueryWrapper<>(team);
+//        Page<Team> page = teamService.page(new Page<>(pageNum, pageSize), queryWrapper);
+//        return ResultUtils.success(page);
+//    }
+
     /**
-     * 根据分页获取队伍列表
+     * 加入队伍
+     * @param teamJoinRequest
+     * @param request
+     * @return
      */
-    @GetMapping("/list/page")
-    public BaseResponse<Page<Team>> pageTeam(TeamQuery teamQuery) {
-        if (teamQuery == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        int pageNum = teamQuery.getPageNum();
-        int pageSize = teamQuery.getPageSize();
-        Team team = new Team();
-        BeanUtils.copyProperties(teamQuery, team);
-        QueryWrapper<Team> queryWrapper = new QueryWrapper<>(team);
-        Page<Team> page = teamService.page(new Page<>(pageNum, pageSize), queryWrapper);
-        return ResultUtils.success(page);
-    }
-
-
     @PostMapping("/join")
     public BaseResponse<Boolean> joinTeam(TeamJoinRequest teamJoinRequest, HttpServletRequest request) {
         if (teamJoinRequest == null) {
@@ -138,6 +145,24 @@ public class TeamController {
         User safetyUser = userService.getLoginUser(request);
 
         boolean result = teamService.joinTeam(teamJoinRequest, safetyUser);
+        return ResultUtils.success(result);
+    }
+
+
+    /**
+     * 退出队伍
+     * @param teamQuitRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/quit")
+    public BaseResponse<Boolean> quitTeam(TeamQuitRequest teamQuitRequest, HttpServletRequest request) {
+        if (teamQuitRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User safetyUser = userService.getLoginUser(request);
+
+        boolean result = teamService.quitTeam(teamQuitRequest, safetyUser);
         return ResultUtils.success(result);
     }
 

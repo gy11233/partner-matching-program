@@ -5,6 +5,7 @@ import com.gy11233.model.domain.Team;
 import com.gy11233.model.domain.User;
 import com.gy11233.model.dto.TeamQuery;
 import com.gy11233.model.request.TeamJoinRequest;
+import com.gy11233.model.request.TeamQuitRequest;
 import com.gy11233.model.request.TeamUpdateRequest;
 import com.gy11233.model.vo.TeamUserVO;
 
@@ -23,4 +24,9 @@ public interface TeamService extends IService<Team> {
     boolean updateTeam(TeamUpdateRequest team, User loginUser);
 
     boolean joinTeam(TeamJoinRequest teamJoinRequest, User user);
+
+    boolean quitTeam(TeamQuitRequest teamQuitRequest, User user);
+
+    boolean deleteTeam(Long teamId, User user);
+
 }
