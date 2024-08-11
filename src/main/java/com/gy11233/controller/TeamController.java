@@ -1,29 +1,32 @@
 package com.gy11233.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gy11233.common.BaseResponse;
 import com.gy11233.common.ErrorCode;
 import com.gy11233.common.ResultUtils;
+import com.gy11233.common.DeleteRequest;
 import com.gy11233.exception.BusinessException;
 import com.gy11233.model.domain.Team;
 import com.gy11233.model.domain.User;
+import com.gy11233.model.domain.UserTeam;
 import com.gy11233.model.dto.TeamQuery;
-import com.gy11233.model.request.TeamAddRequest;
-import com.gy11233.model.request.TeamJoinRequest;
-import com.gy11233.model.request.TeamQuitRequest;
-import com.gy11233.model.request.TeamUpdateRequest;
+import com.gy11233.model.request.*;
 import com.gy11233.model.vo.TeamUserVO;
 import com.gy11233.service.TeamService;
 
 import com.gy11233.service.UserService;
+import com.gy11233.service.UserTeamService;
 import org.springframework.beans.BeanUtils;
-import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/team")
@@ -35,6 +38,10 @@ public class TeamController {
 
     @Resource
     UserService userService;
+
+
+    @Resource
+    UserTeamService userTeamService;
 
     /**
      * 增加队伍
@@ -55,12 +62,16 @@ public class TeamController {
      * 删除队伍
      */
     @PostMapping("/delete")
-    public BaseResponse<Boolean> deleteTeam(Long teamId, HttpServletRequest request) {
-        if (teamId ==  null || teamId <= 0) {
+    public BaseResponse<Boolean> deleteTeam(@RequestBody DeleteRequest teamDeleteRequest, HttpServletRequest request) {
+        if (teamDeleteRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        Long id = teamDeleteRequest.getId();
+        if (id == null || id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User safetyUser = userService.getLoginUser(request);
-        boolean remove = teamService.deleteTeam(teamId, safetyUser);
+        boolean remove = teamService.deleteTeam(id, safetyUser);
         if (!remove) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "删除失败");
         }
@@ -103,7 +114,7 @@ public class TeamController {
     /**
      * 获取队伍列表 可以根据分页获取或者直接使用默认分页
      */
-
+    // todo 改成分页的方法
     @GetMapping("/list")
     public BaseResponse<List<TeamUserVO>> listTeam(TeamQuery teamQuery, HttpServletRequest request) {
         if (teamQuery == null) {
@@ -111,8 +122,17 @@ public class TeamController {
         }
         boolean isAdmin = userService.isAdmin(request);
         List<TeamUserVO> list = teamService.listTeams(teamQuery, isAdmin);
+        if (CollectionUtils.isEmpty(list)) {
+            return  ResultUtils.success(list);
+        }
+        // 对用户已经加入的队伍 设置hasJoin为true
+        teamService.hasJoinTeam(list, request);
+        // 统计每个小组的人数
+        teamService.hasJoinTeamNum(list);
         return ResultUtils.success(list);
     }
+
+
 
 //    /**
 //     * 根据分页获取队伍列表
@@ -138,7 +158,7 @@ public class TeamController {
      * @return
      */
     @PostMapping("/join")
-    public BaseResponse<Boolean> joinTeam(TeamJoinRequest teamJoinRequest, HttpServletRequest request) {
+    public BaseResponse<Boolean> joinTeam(@RequestBody TeamJoinRequest teamJoinRequest, HttpServletRequest request) {
         if (teamJoinRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -156,7 +176,7 @@ public class TeamController {
      * @return
      */
     @PostMapping("/quit")
-    public BaseResponse<Boolean> quitTeam(TeamQuitRequest teamQuitRequest, HttpServletRequest request) {
+    public BaseResponse<Boolean> quitTeam(@RequestBody TeamQuitRequest teamQuitRequest, HttpServletRequest request) {
         if (teamQuitRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -167,5 +187,43 @@ public class TeamController {
     }
 
 
+    /**
+     * 获取用户创建的所有队伍
+     * @param teamQuery
+     * @param request
+     * @return
+     */
+    @GetMapping("/list/my/create")
+    public BaseResponse<List<TeamUserVO>> listMyCreateTeams(TeamQuery teamQuery, HttpServletRequest request) {
+        if (teamQuery == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        boolean isAdmin = userService.isAdmin(loginUser);
+        teamQuery.setUserId(loginUser.getId());
+        List<TeamUserVO> list = teamService.listTeams(teamQuery, true);
+        teamService.hasJoinTeam(list, request);
+        return ResultUtils.success(list);
+    }
+
+    @GetMapping("/list/my/join")
+    public BaseResponse<List<TeamUserVO>> listMyJoinTeams(TeamQuery teamQuery, HttpServletRequest request) {
+        if (teamQuery == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        long userId = loginUser.getId();
+        boolean isAdmin = userService.isAdmin(loginUser);
+        QueryWrapper<UserTeam> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("user_id", userId);
+        List<UserTeam> userTeamList = userTeamService.list(queryWrapper);
+        // 过滤到userTeamList中teamId重复的
+        Map<Long, List<UserTeam>> listMap = userTeamList.stream().collect(Collectors.groupingBy(UserTeam::getTeamId));
+        List<Long> idlist = new ArrayList<>(listMap.keySet());
+        teamQuery.setIdList(idlist);
+        List<TeamUserVO> list = teamService.listTeams(teamQuery, true);
+        teamService.hasJoinTeam(list, request);
+        return ResultUtils.success(list);
+    }
 
 }

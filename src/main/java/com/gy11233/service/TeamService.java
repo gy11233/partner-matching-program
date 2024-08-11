@@ -9,6 +9,7 @@ import com.gy11233.model.request.TeamQuitRequest;
 import com.gy11233.model.request.TeamUpdateRequest;
 import com.gy11233.model.vo.TeamUserVO;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**
@@ -29,4 +30,16 @@ public interface TeamService extends IService<Team> {
 
     boolean deleteTeam(Long teamId, User user);
 
+    /**
+     * 把TeamUserVO中用户是否加入的hasJoin补充齐全
+     * @param list
+     * @param request
+     */
+    void hasJoinTeam(List<TeamUserVO> list, HttpServletRequest request);
+
+    /**
+     * 把每个队一共有多少人加入补充齐
+     * @param list
+     */
+    void hasJoinTeamNum(List<TeamUserVO> list);
 }

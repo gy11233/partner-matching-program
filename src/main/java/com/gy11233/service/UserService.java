@@ -69,4 +69,12 @@ public interface UserService extends IService<User> {
     boolean isAdmin(User user);
 
     User getLoginUser(HttpServletRequest request);
+
+    /**
+     * 匹配最合适的num个用户
+     * @param num
+     * @param user
+     * @return
+     */
+    List<User> matchUsers(int num, User loginUser);
 }

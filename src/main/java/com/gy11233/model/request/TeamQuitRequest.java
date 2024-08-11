@@ -10,5 +10,5 @@ public class TeamQuitRequest implements Serializable {
     /**
      * id
      */
-    private Long id;
+    private Long teamId;
 }

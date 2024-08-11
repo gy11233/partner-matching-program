@@ -8,6 +8,7 @@ import com.gy11233.exception.BusinessException;
 import com.gy11233.model.domain.User;
 import com.gy11233.model.request.UserLoginRequest;
 import com.gy11233.model.request.UserRegisterRequest;
+import com.gy11233.model.vo.UserVO;
 import com.gy11233.service.UserService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -171,12 +172,26 @@ public class UserController {
         return ResultUtils.success(result);
     }
 
+    // todo:推荐的用户是随机的 需要完善
     @GetMapping("/recommend")
     public BaseResponse<List<User>> recommendUsers(long pageSize, long pageNum, HttpServletRequest request){
         // 通过userId查看redis中是否有对应的信息
         User userObj = (User)request.getSession().getAttribute(USER_LOGIN_STATE);
         return ResultUtils.success(userService.recommendUsers(pageSize, pageNum, userObj));
 
+    }
+
+    /**
+     * 获取最匹配的用户
+     */
+    @GetMapping("/match")
+    public BaseResponse<List<User>> matchUsers(int num, HttpServletRequest request) {
+        if (num <= 0 || num >20) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        List<User> userList = userService.matchUsers(num, loginUser);
+        return ResultUtils.success(userList);
     }
 
 
