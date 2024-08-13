@@ -343,7 +343,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public List<User> searchUserByTags(List<String> tagNameList){
+    public List<UserVO> searchUserByTags(List<String> tagNameList, User loginUser){
         if (CollectionUtils.isEmpty(tagNameList)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -362,7 +362,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 if (!tagSet.contains(tagName)) return false;
             }
             return true;
-        }).map(this::getSafetyUser).collect(Collectors.toList());
+        }).map(user -> getUserVo(user, loginUser)).collect(Collectors.toList());
     }
 
     @Override

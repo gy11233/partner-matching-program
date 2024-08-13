@@ -582,6 +582,10 @@ partner:precachejob:docache:lock
 #### 用户匹配 match接口
 全都改为userVO作为返回类型
 
+#### 用户通过标签搜索接口
+全都改为userVO作为返回类型
+
+
 #### 位置信息
 1. 数据库保存经度和纬度
 2. 推荐用户时，计算两个用户之间的距离，缓存距离 
@@ -590,8 +594,11 @@ partner:precachejob:docache:lock
 1. 依据redis中存储的位置信息
 2. 算方圆n km中的用户
 
-#### 添加队伍
+#### 我加入和创建的队伍
+todo:可以查到所有的队伍，包括隐私和加密的队伍
 
+#### 标签搜索功能
+todo: 现在太慢了 需要提速
 ### 增加聊天功能  
 可以参考https://github.com/Zhaosml/PartnerMatching.git 
 
