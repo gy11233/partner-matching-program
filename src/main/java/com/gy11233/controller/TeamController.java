@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/team")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials="true") // 解决跨域
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials="true") // 解决跨域
 public class TeamController {
 
     @Resource
@@ -203,6 +203,8 @@ public class TeamController {
         teamQuery.setUserId(loginUser.getId());
         List<TeamUserVO> list = teamService.listTeams(teamQuery, true);
         teamService.hasJoinTeam(list, request);
+        // 统计每个小组的人数
+        teamService.hasJoinTeamNum(list);
         return ResultUtils.success(list);
     }
 
@@ -223,6 +225,8 @@ public class TeamController {
         teamQuery.setIdList(idlist);
         List<TeamUserVO> list = teamService.listTeams(teamQuery, true);
         teamService.hasJoinTeam(list, request);
+        // 统计每个小组的人数
+        teamService.hasJoinTeamNum(list);
         return ResultUtils.success(list);
     }
 

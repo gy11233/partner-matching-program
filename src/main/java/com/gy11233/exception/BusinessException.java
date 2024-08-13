@@ -2,6 +2,7 @@ package com.gy11233.exception;
 
 
 import com.gy11233.common.ErrorCode;
+import lombok.Data;
 
 /**
  * 自定义异常类
@@ -9,6 +10,7 @@ import com.gy11233.common.ErrorCode;
  */
 public class BusinessException extends RuntimeException {
 
+    private static final long serialVersionUID = -2829426741755648260L;
     /**
      * 异常码
      */

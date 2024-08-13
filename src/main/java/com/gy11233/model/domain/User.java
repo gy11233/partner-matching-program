@@ -90,7 +90,19 @@ public class User implements Serializable {
      */
     private String tags;
 
+    /**
+     * 自我简介
+     */
+    private String profile;
 
+    /**
+     * 经度
+     */
+    private Double longitude;
+    /**
+     * 纬度
+     */
+    private  Double dimension;
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;

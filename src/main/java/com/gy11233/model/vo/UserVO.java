@@ -76,7 +76,17 @@ public class UserVO {
     private String planetCode;
 
     /**
+     * 用户简介
+     */
+    private String profile;
+
+    /**
      * 标签 json
      */
     private String tags;
+
+    /**
+     * 用户距离
+     */
+    private Double distance;
 }

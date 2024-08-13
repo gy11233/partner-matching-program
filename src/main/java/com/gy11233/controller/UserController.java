@@ -27,7 +27,7 @@ import static com.gy11233.contant.UserConstant.USER_LOGIN_STATE;
  */
 @RestController
 @RequestMapping("/user")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials="true") // 解决跨域
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials="true") // 解决跨域
 //@CrossOrigin // 解决跨域
 public class UserController {
 
@@ -46,14 +46,7 @@ public class UserController {
         if (userRegisterRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        String userAccount = userRegisterRequest.getUserAccount();
-        String userPassword = userRegisterRequest.getUserPassword();
-        String checkPassword = userRegisterRequest.getCheckPassword();
-        String planetCode = userRegisterRequest.getPlanetCode();
-        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, planetCode)) {
-            return null;
-        }
-        long result = userService.userRegister(userAccount, userPassword, checkPassword, planetCode);
+        long result = userService.userRegister(userRegisterRequest);
         return ResultUtils.success(result);
     }
 
@@ -107,7 +100,6 @@ public class UserController {
             throw new BusinessException(ErrorCode.NOT_LOGIN);
         }
         long userId = currentUser.getId();
-        // TODO 校验用户是否合法
         User user = userService.getById(userId);
         User safetyUser = userService.getSafetyUser(user);
         return ResultUtils.success(safetyUser);
@@ -172,9 +164,16 @@ public class UserController {
         return ResultUtils.success(result);
     }
 
+    /**
+     * 推荐主页用户
+     * @param pageSize
+     * @param pageNum
+     * @param request
+     * @return
+     */
     // todo:推荐的用户是随机的 需要完善
     @GetMapping("/recommend")
-    public BaseResponse<List<User>> recommendUsers(long pageSize, long pageNum, HttpServletRequest request){
+    public BaseResponse<List<UserVO>> recommendUsers(long pageSize, long pageNum, HttpServletRequest request){
         // 通过userId查看redis中是否有对应的信息
         User userObj = (User)request.getSession().getAttribute(USER_LOGIN_STATE);
         return ResultUtils.success(userService.recommendUsers(pageSize, pageNum, userObj));
@@ -185,13 +184,27 @@ public class UserController {
      * 获取最匹配的用户
      */
     @GetMapping("/match")
-    public BaseResponse<List<User>> matchUsers(int num, HttpServletRequest request) {
+    public BaseResponse<List<UserVO>> matchUsers(int num, HttpServletRequest request) {
         if (num <= 0 || num >20) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        List<User> userList = userService.matchUsers(num, loginUser);
+        List<UserVO> userList = userService.matchUsers(num, loginUser);
         return ResultUtils.success(userList);
+    }
+
+    /**
+     * 搜索附近用户
+     */
+    @GetMapping("/searchNearby")
+    public BaseResponse<List<UserVO>> searchNearby(int radius, HttpServletRequest request) {
+        if (radius <= 0 || radius > 10000) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User user = userService.getLoginUser(request);
+        User loginUser = userService.getById(user.getId());
+        List<UserVO> userVOList = userService.searchNearby(radius, loginUser);
+        return ResultUtils.success(userVOList);
     }
 
 

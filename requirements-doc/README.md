@@ -21,9 +21,22 @@
 3. 队伍操作 
    1. 创建队伍，查询加入队伍  todo:私密的队伍在哪里查到
    2. 搜索队伍(公开队伍、私密队伍、按照名称或者描述搜索队伍)
+   3. todo:队伍需要可以聊天
 4. 数据库全都是假数据，需要造一些真的数据
 5. 没有统一的权限管理
 
+### v2.0.0
+目标
+1. 增加用户注册功能
+2. 增加聊天功能  可以参考https://github.com/Zhaosml/PartnerMatching.git
+3. 修改匹配算法 knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master
+4. 解决部分查询慢的问题
+
+### v2.1.0
+目标
+1. aop加配置注解实现布隆过滤器
+   http://doc.ochiamalu.top/
+2. 进一步优化
 
 ## 技术栈
 ### 前端
@@ -555,6 +568,40 @@ partner:precachejob:docache:lock
     - synchronized 可以直接加在加入队伍的代码逻辑中 问题：但是不同的用户id 或者加入不同的队伍 没必要都一起排队
     - 两个锁：对用户id和队伍id加锁
     - 多服务器的问题怎么办？用分布式锁？
+   
+
+## v2.0.0版本优化
+### 调整数据库格式，和新版本对应
+#### 用户注册
+1.  redisLimiterManager.doRateLimiter限流：分布式限流
+2. 如果用户信息插入数据库，则计算用户坐标信息并存入Redis， todo:看这部分有没有必要
+3. 用户注册后，删除recommend的缓存信息
+#### 用户推荐 recommend 接口 
+全都改为userVO作为返回类型
+
+#### 用户匹配 match接口
+全都改为userVO作为返回类型
+
+#### 位置信息
+1. 数据库保存经度和纬度
+2. 推荐用户时，计算两个用户之间的距离，缓存距离 
+3. todo:这里的距离完全依赖缓存吗？还是换到数据库操作
+#### 搜索附近用户
+1. 依据redis中存储的位置信息
+2. 算方圆n km中的用户
+
+#### 添加队伍
+
+### 增加聊天功能  
+可以参考https://github.com/Zhaosml/PartnerMatching.git 
+
+### 修改匹配算法 
+knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master 
+
+### 解决部分查询慢的问题
+
+
+
 ----
 ## 改进和思考
 1. 连接池用的jdbc 可以之后替换成druid连接池

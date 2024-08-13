@@ -1,27 +1,38 @@
 package com.gy11233.service.impl;
-
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.gy11233.contant.RedisConstant;
+import com.gy11233.mannger.RateLimiter;
 import com.gy11233.model.domain.User;
 import com.gy11233.common.ErrorCode;
 import com.gy11233.exception.BusinessException;
+import com.gy11233.model.request.UserRegisterRequest;
+import com.gy11233.model.vo.UserVO;
 import com.gy11233.service.UserService;
 import com.gy11233.mapper.UserMapper;
 import com.gy11233.utils.AlgorithmUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.math3.util.Pair;
+import org.springframework.beans.BeanUtils;
+import org.springframework.data.geo.*;
+import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 
+import com.github.rholder.retry.Retryer;
+import com.github.rholder.retry.RetryException;
+
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,6 +57,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     @Resource
     private RedisTemplate redisTemplate;
 
+    @Resource
+    private RateLimiter redisLimiterManager;
+
+    @Resource
+    StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private Retryer<Boolean> retryer;
+
     /**
      * 盐值，混淆密码
      */
@@ -54,63 +74,112 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     /**
      * 用户注册
      *
-     * @param userAccount   用户账户
-     * @param userPassword  用户密码
-     * @param checkPassword 校验密码
-     * @param planetCode    星球编号
      * @return 新用户 id
      */
     @Override
-    public long userRegister(String userAccount, String userPassword, String checkPassword, String planetCode) {
-        // 1. 校验
-        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, planetCode)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
+    public long userRegister(UserRegisterRequest userRegisterRequest) {
+        String userAccount = userRegisterRequest.getUserAccount();
+        String userPassword = userRegisterRequest.getUserPassword();
+        String checkPassword = userRegisterRequest.getCheckPassword();
+        List<String> tagNameList = userRegisterRequest.getTagNameList();
+        String username = userRegisterRequest.getUsername();
+        Double longitude = userRegisterRequest.getLongitude();
+        Double dimension = userRegisterRequest.getDimension();
+        String phone = userRegisterRequest.getPhone();
+        String avatarUrl = userRegisterRequest.getAvatarUrl();
+        Integer gender = userRegisterRequest.getGender();
+
+        //1.校验
+        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号或密码为空");
         }
         if (userAccount.length() < 4) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户账号过短");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户账号过短，至少要4位");
         }
         if (userPassword.length() < 8 || checkPassword.length() < 8) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码过短");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码过短，至少要8位");
         }
-        if (planetCode.length() > 5) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "星球编号过长");
+        if (CollectionUtils.isEmpty(tagNameList)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请至少选择一个标签");
         }
-        // 账户不能包含特殊字符
-        String validPattern = "[`~!@#$%^&*()+=|{}':;',\\\\[\\\\].<>/?~！@#￥%……&*（）——+|{}【】‘；：”“’。，、？]";
-        Matcher matcher = Pattern.compile(validPattern).matcher(userAccount);
-        if (matcher.find()) {
-            return -1;
+        if (StringUtils.isBlank(username) || username.length() > 10) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "昵称不合法，长度不得超过 10");
         }
-        // 密码和校验密码相同
-        if (!userPassword.equals(checkPassword)) {
-            return -1;
+        if (longitude == null || longitude > 180 || longitude < -180) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "坐标经度不合法");
         }
-        // 账户不能重复
+        if (dimension == null || dimension > 90 || dimension < -90) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "坐标维度不合法");
+        }
+
+
+        // 限流
+        redisLimiterManager.doRateLimiter(userAccount);
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_account", userAccount);
-        long count = userMapper.selectCount(queryWrapper);
-        if (count > 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
+        Long userCount = userMapper.selectCount(queryWrapper);
+        if (userCount > 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号已存在");
         }
-        // 星球编号不能重复
-        queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("planet_code", planetCode);
-        count = userMapper.selectCount(queryWrapper);
-        if (count > 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "编号重复");
-        }
-        // 2. 加密
+        //2.加密
         String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
-        // 3. 插入数据
+        //3.插入数据
         User user = new User();
         user.setUserAccount(userAccount);
         user.setUserPassword(encryptPassword);
-        user.setPlanetCode(planetCode);
+        user.setLongitude(longitude);
+        user.setDimension(dimension);
+        user.setUsername(username);
+        user.setGender(gender);
+        user.setAvatarUrl(avatarUrl);
+        user.setPhone(phone);
+        // 处理用户标签
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append('[');
+        for (int i = 0; i < tagNameList.size(); i++) {
+            stringBuilder.append('"').append(tagNameList.get(i)).append('"');
+            if (i < tagNameList.size() - 1) {
+                stringBuilder.append(',');
+            }
+        }
+        stringBuilder.append(']');
+        user.setTags(stringBuilder.toString());
         boolean saveResult = this.save(user);
         if (!saveResult) {
-            return -1;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "添加失败");
         }
-        return user.getId();
+        // 如果用户信息插入数据库，则计算用户坐标信息并存入Redis
+        // todo: 这部分的作用是计算用户的坐标信息并存入redis 但是随着人数的增加可能不现实 后续调研
+        Long addToRedisResult = stringRedisTemplate.opsForGeo().add(RedisConstant.USER_GEO_KEY,
+                new Point(user.getLongitude(), user.getDimension()), String.valueOf(user.getId()));
+        if (addToRedisResult == null || addToRedisResult <= 0) {
+            log.error("用户注册时坐标信息存入Redis失败");
+        }
+        // 统一设置星球编号 不让用户自己定义
+        long userId = user.getId();
+        User updateUser = new User();
+        updateUser.setId(userId);
+        updateUser.setPlanetCode(String.valueOf(userId));
+        boolean updateResult = this.updateById(updateUser);
+        // 用户注册后对标签进行缓存
+        // todo: 这一步的意义是？？？ 配合缓存吗
+        if (!updateResult) {
+            log.info("{}用户星球编号设置失败", userId);
+        } else {
+            Set<String> keys = stringRedisTemplate.keys(RedisConstant.USER_RECOMMEND_KEY + ":*");
+            for (String key : keys) {
+                try {
+                    retryer.call(() -> stringRedisTemplate.delete(key));
+                } catch (ExecutionException e) {
+                    log.error("用户注册后删除缓存重试时失败");
+                    throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+                } catch (RetryException e) {
+                    log.error("用户注册后删除缓存达到最大重试次数或超过时间限制");
+                    throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+                }
+            }
+        }
+        return userId;
     }
 
 
@@ -161,6 +230,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return safetyUser;
     }
 
+
+
     /**
      * 用户脱敏
      *
@@ -186,6 +257,47 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         safetyUser.setCreateTime(originUser.getCreateTime());
         safetyUser.setTags(originUser.getTags());
         return safetyUser;
+    }
+
+    @Override
+    public UserVO getUserVo(User user, User originUser) {
+        if (user == null) {
+            return null;
+        }
+        UserVO userVO = new UserVO();
+        userVO.setId(user.getId());
+        userVO.setUsername(user.getUsername());
+        userVO.setUserAccount(user.getUserAccount());
+        userVO.setAvatarUrl(user.getAvatarUrl());
+        userVO.setGender(user.getGender());
+        userVO.setPhone(user.getPhone());
+        userVO.setEmail(user.getEmail());
+        userVO.setUserStatus(user.getUserStatus());
+        userVO.setCreateTime(user.getCreateTime());
+        userVO.setUpdateTime(user.getUpdateTime());
+        userVO.setUserRole(user.getUserRole());
+        userVO.setPlanetCode(user.getPlanetCode());
+        userVO.setTags(user.getTags());
+        if (originUser == null) {
+            userVO.setDistance(null);
+        }
+        else {
+            String redisUserGeoKey = RedisConstant.USER_GEO_KEY;
+            // 计算user距离originUser的距离
+            // todo:是否应该改成数据库操作
+            Distance distance = stringRedisTemplate.opsForGeo().distance(redisUserGeoKey,
+                    String.valueOf(originUser.getId()), String.valueOf(user.getId()),
+                    RedisGeoCommands.DistanceUnit.KILOMETERS);
+            if (distance == null) {
+                userVO.setDistance(null);
+            }
+            else {
+                userVO.setDistance(distance.getValue());
+
+            }
+        }
+
+        return userVO;
     }
 
     /**
@@ -274,11 +386,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
-    public List<User> recommendUsers(long pageSize, long pageNum, User user) {
+    public List<UserVO> recommendUsers(long pageSize, long pageNum, User user) {
         // 如果user没有登录 key设置为默认的结果
         String key;
         if (user == null) {
-            key = "partner:user:recommend:default";
+            key = RedisConstant.USER_RECOMMEND_KEY + ":" + "default";
         }
         // 如果登录且合法，设置成id
         else{
@@ -293,17 +405,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             if (userOld == null) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR);
             }
-            key = String.format("partner:user:recommend:%s", id);
+            key = RedisConstant.USER_RECOMMEND_KEY + ":" + user.getId();
         }
 
         ValueOperations<String, Object> operations = redisTemplate.opsForValue();
         Page<User> page = (Page<User>)operations.get(key);
         // 有缓存直接返回缓存
         if (page != null) {
-            return page.getRecords().stream().map(this::getSafetyUser).collect(Collectors.toList());
+            return page.getRecords().stream().map(user1 -> getUserVo(user1, user)).collect(Collectors.toList());
         }
         // 没有缓存查询并加入缓存
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        // 只有当用户登录了，才不能查出用户的信息作为推荐
+        if (user != null){
+            queryWrapper.ne("id", user.getId());
+        }
         Page<User> list = page(new Page<>(pageNum, pageSize), queryWrapper);
         try {
             operations.set(key, list, 100000, TimeUnit.MILLISECONDS);
@@ -311,7 +427,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             log.error("redis set key error", e);
         }
         List<User> userList = list.getRecords();
-        return userList.stream().map(this::getSafetyUser).collect(Collectors.toList());
+        return userList.stream().map(user1 -> getUserVo(user1, user)).collect(Collectors.toList());
     }
 
     @Override
@@ -340,7 +456,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
-    public List<User> matchUsers(int num, User loginUser) {
+    public List<UserVO> matchUsers(int num, User loginUser) {
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.select("id", "tags");
         // 去除tags为空的用户
@@ -377,15 +493,51 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 1, 3, 2
         // User1、User2、User3
         // 1 => User1, 2 => User2, 3 => User3
-        Map<Long, List<User>> userIdUserListMap = this.list(userQueryWrapper)
+        Map<Long, List<UserVO>> userIdUserListMap = this.list(userQueryWrapper)
                 .stream()
-                .map(user -> getSafetyUser(user))
-                .collect(Collectors.groupingBy(User::getId));
-        List<User> finalUserList = new ArrayList<>();
+                .map(user -> getUserVo(user, loginUser))
+                .collect(Collectors.groupingBy(UserVO::getId));
+        List<UserVO> finalUserList = new ArrayList<>();
         for (Long userId : userIdList) {
             finalUserList.add(userIdUserListMap.get(userId).get(0));
         }
         return finalUserList;
     }
+
+    @Override
+    public List<UserVO> searchNearby(int radius, User loginUser) {
+        String geoKey = RedisConstant.USER_GEO_KEY;
+        String userId = String.valueOf(loginUser.getId());
+        Double longitude = loginUser.getLongitude();
+        Double dimension = loginUser.getDimension();
+        if (longitude == null || dimension == null) {
+            throw new BusinessException(ErrorCode.NULL_ERROR, "登录用户经纬度参数为空");
+        }
+        Distance geoRadius = new Distance(radius, RedisGeoCommands.DistanceUnit.KILOMETERS);
+        Circle circle = new Circle(new Point(longitude, dimension), geoRadius);
+        GeoResults<RedisGeoCommands.GeoLocation<String>> results = stringRedisTemplate.opsForGeo()
+                .radius(geoKey, circle);
+        List<Long> userIdList = new ArrayList<>();
+        for (GeoResult<RedisGeoCommands.GeoLocation<String>> result : results) {
+            String id = result.getContent().getName();
+            if (!userId.equals(id)) {
+                userIdList.add(Long.parseLong(id));
+            }
+        }
+        List<UserVO> userVOList = userIdList.stream().map(
+                id -> {
+                    UserVO userVO = new UserVO();
+                    User user = this.getById(id);
+                    BeanUtils.copyProperties(user, userVO);
+                    Distance distance = stringRedisTemplate.opsForGeo().distance(geoKey, userId, String.valueOf(id),
+                            RedisGeoCommands.DistanceUnit.KILOMETERS);
+                    userVO.setDistance(distance.getValue());
+                    return userVO;
+                }
+        ).collect(Collectors.toList());
+        return userVOList;
+    }
+
+
 }
 

@@ -2,6 +2,8 @@ package com.gy11233.service;
 
 import com.gy11233.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.gy11233.model.request.UserRegisterRequest;
+import com.gy11233.model.vo.UserVO;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -15,13 +17,9 @@ public interface UserService extends IService<User> {
     /**
      * 用户注册
      *
-     * @param userAccount   用户账户
-     * @param userPassword  用户密码
-     * @param checkPassword 校验密码
-     * @param planetCode    星球编号
      * @return 新用户 id
      */
-    long userRegister(String userAccount, String userPassword, String checkPassword, String planetCode);
+    long userRegister(UserRegisterRequest userRegisterRequest);
 
     /**
      * 用户登录
@@ -41,7 +39,13 @@ public interface UserService extends IService<User> {
      */
     User getSafetyUser(User originUser);
 
-    // [加入编程导航](https://t.zsxq.com/0emozsIJh) 深耕编程提升【两年半】、国内净值【最高】的编程社群、用心服务【20000+】求学者、帮你自学编程【不走弯路】
+    /**
+     * 将普通用户转成userV0
+     * 普通用户为user 主要查询用户时originUser，距离为计算两者的距离
+     * @param originUser
+     * @return
+     */
+    UserVO getUserVo(User user, User originUser);
 
     /**
      * 用户注销
@@ -55,7 +59,7 @@ public interface UserService extends IService<User> {
 
     int updateUser(User user, User currentUser);
 
-    List<User> recommendUsers(long pageSize, long pageNum, User user);
+    List<UserVO> recommendUsers(long pageSize, long pageNum, User user);
 
     /**
      * 是否为管理员
@@ -76,5 +80,7 @@ public interface UserService extends IService<User> {
      * @param user
      * @return
      */
-    List<User> matchUsers(int num, User loginUser);
+    List<UserVO> matchUsers(int num, User loginUser);
+
+    List<UserVO> searchNearby(int radius, User loginUser);
 }

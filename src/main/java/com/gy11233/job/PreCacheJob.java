@@ -41,9 +41,9 @@ public class PreCacheJob {
         try {
             if (lock.tryLock(0, -1, TimeUnit.MILLISECONDS)) {
                 System.out.println("getlock" + Thread.currentThread().getId());
-                for (Long userId: importantUsers) {
+                for (Long userId : importantUsers) {
 
-                    String key = String.format("partner:user:recommend:%s", userId) ;
+                    String key = String.format("partner:user:recommend:%s", userId);
                     ValueOperations<String, Object> operations = redisTemplate.opsForValue();
                     // 没有缓存查询并加入缓存
                     QueryWrapper<User> queryWrapper = new QueryWrapper<>();
