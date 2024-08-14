@@ -16,6 +16,7 @@ import com.gy11233.model.vo.WebSocketVO;
 import com.gy11233.service.ChatService;
 import com.gy11233.service.TeamService;
 import com.gy11233.service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -31,6 +32,7 @@ import static com.gy11233.contant.ChatConstant.*;
 import static com.gy11233.contant.RedisConstant.*;
 import static com.gy11233.contant.UserConstant.*;
 
+@Slf4j
 @Service
 public class ChatServiceImpl extends ServiceImpl<ChatMapper, Chat>
         implements ChatService {
@@ -152,7 +154,7 @@ public class ChatServiceImpl extends ServiceImpl<ChatMapper, Chat>
     }
 
     /**
-     * 聊天结果
+     * 封装聊天结果
      *
      * @param userId     用户id
      * @param toId       到id

@@ -62,8 +62,8 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend>
         boolean result2 = false;
         try{
             // 尝试获取锁
-           if (lock.tryLock(0, 30000, TimeUnit.MILLISECONDS)) {
-               log.info(Thread.currentThread().getId() + "我拿到锁了");
+           if (lock.tryLock(10000, -1, TimeUnit.MILLISECONDS)) {
+               log.info("{}我拿到锁了", Thread.currentThread().getId());
                // 查询是否添加了该用户
                QueryWrapper<Friend> queryWrapper = new QueryWrapper();
                queryWrapper.eq("user_id", userId);
@@ -96,7 +96,7 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend>
             log.error("addUser error", e);
         } finally {
             if (lock.isHeldByCurrentThread()) {
-                log.info(Thread.currentThread().getId() + "锁已经被释放");
+                log.info("{}锁已经被释放", Thread.currentThread().getId());
                 lock.unlock();
             }
         }

@@ -4,7 +4,9 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.google.gson.Gson;
+import com.gy11233.common.ErrorCode;
 import com.gy11233.config.HttpSessionConfig;
+import com.gy11233.exception.BusinessException;
 import com.gy11233.model.domain.Chat;
 import com.gy11233.model.domain.Team;
 import com.gy11233.model.domain.User;
@@ -168,7 +170,7 @@ public class WebSocket {
 
     /**
      * 开放
-     *
+     * 用户连接时的操作
      * @param session 会话
      * @param userId  用户id
      * @param teamId  团队id
@@ -200,7 +202,7 @@ public class WebSocket {
                 this.httpSession = userHttpSession;
             }
 
-            if (!"NaN".equals(teamId)) {
+            if (!"NaN".equals(teamId)) { // 队伍聊天室的操作
                 if (!ROOMS.containsKey(teamId)) {
                     ConcurrentHashMap<String, WebSocket> room = new ConcurrentHashMap(0);
                     room.put(userId, this);
@@ -210,7 +212,7 @@ public class WebSocket {
                     ((ConcurrentHashMap) ROOMS.get(teamId)).put(userId, this);
                     addOnlineCount();
                 }
-            } else {
+            } else { // 私人聊天操作
                 SESSIONS.add(session);
                 SESSION_POOL.put(userId, session);
                 this.sendAllUsers();
@@ -222,7 +224,7 @@ public class WebSocket {
 
     /**
      * 关闭
-     *
+     *  关闭连接
      * @param userId  用户id
      * @param teamId  团队id
      * @param session 会话
@@ -242,6 +244,7 @@ public class WebSocket {
                     SESSION_POOL.remove(userId);
                     SESSIONS.remove(session);
                 }
+
                 sendAllUsers();
             }
         } catch (Exception e) {
@@ -250,7 +253,7 @@ public class WebSocket {
     }
 
     /**
-     * 消息
+     * 接受消息后的操作
      *
      * @param message 消息
      * @param userId  用户id
@@ -354,6 +357,7 @@ public class WebSocket {
         ChatMessageVO chatMessageVo = chatService
                 .chatResult(user.getId(), toId, text, chatType, DateUtil.date(System.currentTimeMillis()));
         User loginUser = (User) this.httpSession.getAttribute(USER_LOGIN_STATE);
+
         if (Objects.equals(loginUser.getId(), user.getId())) {
             chatMessageVo.setIsMy(true);
         }
@@ -454,6 +458,7 @@ public class WebSocket {
         HashMap<String, List<WebSocketVO>> stringListHashMap = new HashMap<>(0);
         List<WebSocketVO> webSocketVos = new ArrayList<>();
         stringListHashMap.put("users", webSocketVos);
+        // 获取SESSION_POOL中所有连接的用户，封装成webSocketVO
         for (Serializable key : SESSION_POOL.keySet()) {
             User user = userService.getById(key);
             WebSocketVO webSocketVO = new WebSocketVO();

@@ -607,22 +607,91 @@ https://blog.csdn.net/weixin_44604118/article/details/90484110?ops_request_misc=
 webSocket 的知识 https://blog.csdn.net/tuoniaoxs/article/details/116494440
 https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
 
-准备：
-- pom依赖配置
-- config 配置
-  - WebSocketConfig
-  - HttpSessionConfig  //帮助获取session 详情看https://blog.csdn.net/xueyijin/article/details/105692485
-  - HttpSessionFilter
 1. 前端：
-    ```vue
-       // 开启一个websocket服务 
-        socket = new WebSocket(socketUrl);
-       //打开事件 
-        socket.onopen = function () {
-       startHeartbeat();
-       };
-    ```
-    
+   1. 通过/chat/privateChat获取私聊历史记录
+   2. 初始化：检验浏览器是否支持websocket服务，并建立一个连接
+       ```js
+          // 开启一个websocket服务 
+           socket = new WebSocket(socketUrl);
+          //打开事件 
+           socket.onopen = function () {
+          startHeartbeat();
+          };
+       ```
+   3. 浏览器端收消息，获得从服务端发送过来的文本消息
+        ```js
+            websocket.onmessage = function(msg){}
+        ```
+   4. 定义关闭连接、异常事件
+        ```js
+        socket.onclose = function () {}
+         socket.onerror = function (){}
+       ```
+   5. 定义消息发送方法send，用`socket.send`来发送消息到服务器
+
+2. **后端**
+   1. 准备：
+      - pom依赖配置
+      - config 配置
+          - WebSocketConfig
+          - HttpSessionConfig
+              - 通过重写modifyHandshake方法，从HandshakeRequest中获取HttpSession，并存入ServerEndpointConfig中，之后就可以获取session信息了
+              - 详情看 https://blog.csdn.net/xueyijin/article/details/105692485 https://juejin.cn/post/7202851843487809597
+   2. 获取私聊记录的功能放在了chat模块中
+   3. **编写WebSocket类 （WebSocket通信核心，所有WebSocket的交互在这里定义）**
+   4. 类似于@RequestMapping,WebSocket指定访问地址用@ServerEndpoint(value = "/websocket/{userId}/{teamId}", configurator = HttpSessionConfig.class)
+   5. 定义：
+      - 定义线程安全的集合来存储session: CopyOnWriteArraySet<Session> SESSIONS; 
+      - 定义会话池 Map<String, Session> SESSION_POOL
+      - 定义当前信息session和http对话HttpSession httpSession
+      - 定义连接数onlineCount 需要线程安全
+   6. onOpen websocket连接建立时的操作
+      - 接受参数:
+        - session(websocket自带的session, 用这个来发信息);
+        - userId;
+        - teamId;
+        - EndpointConfig(用来获取httpsession)
+      - 逻辑:
+        - 获取当前httpsession并进行参数检查
+        - 如果是私人聊天，就加入SESSIONS和SESSION_POOL，并向所有会话池中的人发送所有建立连接的人的信息
+   7. OnClose 关闭连接
+       - 接受参数：
+         - session(websocket自带的session);
+         - userId;
+         - teamId;
+       - 逻辑：
+         - 参数检查
+         - 如果是私聊，就移除SESSION_POOL和SESSIONS中的信息
+   8. OnMessage 接受消息后的操作
+      - 参数
+        - message 之后会解析成MessageRequest包装类
+        - userId
+      - 逻辑
+        - 过滤到ping的信息
+        - 如果聊天类型是私聊，对消息进行封装，并发送给接受消息的用户
+        - 保存聊天记录
+        - 删除在redis中缓存的信息
+   - 多个用户的消息发送逻辑是每个连接的客户端会有其独立的 WebSocket 实例,消息的发送过程往往是 客户端-服务器-客户端，每个websocket都有一个独立的session对象
+    所以要把SESSION和线程池SESSION_POLL设置为static 线程安全的 todo:分布式的怎么办？直接存储在redis中
+3. chat 模块
+   1. 获取私聊信息/chat/privateChat
+      - 参数检查
+      - 如果有缓存直接读取缓存
+      - 没有缓存进行查询 
+        - 使用了LambdaQueryWrapper 
+      - 存储在缓存中
+   2. 保存缓存saveCache
+      - 为什么需要缓存：当用户没有退出，但是刷新页面的时候，连接未关闭就重新再次建立，这时候可以直接通过缓存加载数据
+      - <mark>解决雪崩效应的方法！！！ 需要再看
+   3. 删除缓存
+
+### 增加好友功能
+1. 添加好友
+    - 参数检查 自己不能添加自己
+    - <mark>对加好友的范围上锁(重点看一下锁的时间设置)，添加事务
+2. 列出所有好友 
+3. 搜索好友
+4. <mark>需不需要缓存来提速
 ### 增加加好友功能
 
 
