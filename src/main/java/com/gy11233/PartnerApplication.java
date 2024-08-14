@@ -11,8 +11,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * 启动类
  *
  */
-@SpringBootApplication
+//@SpringBootApplication
 @MapperScan("com.gy11233.mapper")
+@SpringBootApplication(scanBasePackages ="com.gy11233")
 @EnableScheduling
 public class PartnerApplication {
 

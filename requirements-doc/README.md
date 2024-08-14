@@ -599,8 +599,32 @@ todo:可以查到所有的队伍，包括隐私和加密的队伍
 
 #### 标签搜索功能
 todo: 现在太慢了 需要提速
+
+
 ### 增加聊天功能  
-可以参考https://github.com/Zhaosml/PartnerMatching.git 
+可以参考https://github.com/Zhaosml/PartnerMatching.git
+https://blog.csdn.net/weixin_44604118/article/details/90484110?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522172354985116800226531987%2522%252C%2522scm%2522%253A%252220140713.130102334.pc%255Fblog.%2522%257D&request_id=172354985116800226531987&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~blog~first_rank_ecpm_v1~rank_v31_ecpm-1-90484110-null-null.nonecase&utm_term=%E8%81%8A%E5%A4%A9&spm=1018.2226.3001.4450
+webSocket 的知识 https://blog.csdn.net/tuoniaoxs/article/details/116494440
+https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
+
+准备：
+- pom依赖配置
+- config 配置
+  - WebSocketConfig
+  - HttpSessionConfig  //帮助获取session 详情看https://blog.csdn.net/xueyijin/article/details/105692485
+  - HttpSessionFilter
+1. 前端：
+    ```vue
+       // 开启一个websocket服务 
+        socket = new WebSocket(socketUrl);
+       //打开事件 
+        socket.onopen = function () {
+       startHeartbeat();
+       };
+    ```
+    
+### 增加加好友功能
+
 
 ### 修改匹配算法 
 knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master 
