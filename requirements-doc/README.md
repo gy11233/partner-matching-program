@@ -557,7 +557,7 @@ partner:precachejob:docache:lock
 ----
 ## 优化
 1. **队伍权限**仅加入队伍和创建队伍的人能够看到队伍操作按钮（list接口能够获取我加入队伍的状态）
-   加入队伍：仅斐队伍创建人，且未加入队伍的人可见；
+   加入队伍：仅队伍创建人，且未加入队伍的人可见；
    更新队伍：仅创建人可见 ；
    解散队伍：仅创建人可见 ；
     退出队伍：创建人不可见，仅已经加入队伍的人可见 
@@ -703,11 +703,27 @@ https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocke
 knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master 
 
 ### redis list结构实现滑动窗口
+1. 如果User未登录，获取默认的key,登录就设置带有用户id的key
+2. 如果有缓存，直接读取缓存
+3. 如果没有缓存，进行分页查询并将查询结果放入缓存中
+4. redis缓存的有效时间设置了1小时，可能和缓存预热的用户推荐页面过期时间有冲突
 
-
-### 解决部分查询慢的问题
-redis session的清理方式??? 设置过期时间 spring.session.timeout
-
+### 所有redis汇总
+1. redis设置session
+   1. 通过yml配置session保存到redis中
+   2. 可以设置过期时间 spring.session.timeout， 系统默认2.5个小时左右
+   3. <mark>redis中保存的信息有待进一步确认
+2. 用户推荐页面缓存预热
+   1. 每天0点执行，对重要用户的推荐进行缓存
+   2. 采用RedissonClient分布式锁，保证只有一个服务器执行预热
+3. 用户推荐页面滑动效果
+   1. 使用redis list 如果有缓存直接查找缓存
+   2. 没有缓存就每次分页查询并存入缓存中，设置过期时间为1小时
+4. 聊天模块的私聊消息
+   1. 连接建立是查询是否有缓存，有缓存直接读取缓存
+   2. 没有缓存查询数据库并存入缓存中
+   3. 这里真的有必要吗 ？？？？
+5. 加入队伍上锁
 
 ----
 ## 改进和思考
@@ -731,3 +747,4 @@ redis session的清理方式??? 设置过期时间 spring.session.timeout
 13. 加入队伍 重复加入队伍问题 疯狂点击还是可能加入 分布式锁来解决
 14. 根据加入队伍来实现匹配？可以进一步实现，考虑knn实现的算法
 15. 思考推荐算法，可以思考一下大数据的排序策略 检索=》召回=》粗排=》精排
+16. 使用邮箱注册 https://blog.csdn.net/qq_42263280/article/details/129584017

@@ -20,7 +20,7 @@ import java.util.List;
 public interface TeamService extends IService<Team> {
     long addTeam(Team team, User loginUser);
 
-    List<TeamUserVO> listTeams(TeamQuery teamQuery, Boolean isAdmin);
+    List<TeamUserVO> listTeams(TeamQuery teamQuery, Boolean isAdmin, Integer hasStatus);
 
     boolean updateTeam(TeamUpdateRequest team, User loginUser);
 

@@ -2,6 +2,7 @@ package com.gy11233.job;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.gy11233.contant.RedisConstant;
 import com.gy11233.model.domain.User;
 import com.gy11233.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +35,7 @@ public class PreCacheJob {
 
     List<Long> importantUsers = Arrays.asList(1L, 2L, 3L, 8L);
     // 每天执行
-    @Scheduled(cron = "0 58 23 * * *")
+    @Scheduled(cron = "0 00 00 * * *")
     public void DoPreCacheJob(){
 
         RLock lock = redissonClient.getLock("partner:precachejob:docache:lock");
@@ -43,7 +44,7 @@ public class PreCacheJob {
                 System.out.println("getlock" + Thread.currentThread().getId());
                 for (Long userId : importantUsers) {
 
-                    String key = String.format("partner:user:recommend:%s", userId);
+                    String key = RedisConstant.USER_RECOMMEND_KEY + ":" + userId;
                     ValueOperations<String, Object> operations = redisTemplate.opsForValue();
                     // 没有缓存查询并加入缓存
                     QueryWrapper<User> queryWrapper = new QueryWrapper<>();

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.gy11233.common.ErrorCode;
+import com.gy11233.contant.RedisConstant;
 import com.gy11233.contant.TeamStatusEnum;
 import com.gy11233.exception.BusinessException;
 import com.gy11233.model.domain.Team;
@@ -130,7 +131,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      * @return
      */
     @Override
-    public List<TeamUserVO> listTeams(TeamQuery teamQuery, Boolean isAdmin) {
+    public List<TeamUserVO> listTeams(TeamQuery teamQuery, Boolean isAdmin, Integer hasStatus) {
         QueryWrapper<Team> queryWrapper = new QueryWrapper<>();
         if (teamQuery != null) {
             Long id = teamQuery.getId();
@@ -164,7 +165,10 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             if (!isAdmin && enumByValues.equals(TeamStatusEnum.PRIVATE)) {
                 throw new BusinessException(ErrorCode.NO_AUTH);
             }
-            queryWrapper.eq("status", enumByValues.getValue());
+            // 通过hasStatus来选择加不加status的查询条件
+            if (hasStatus != null && hasStatus == 1) {
+                queryWrapper.eq("status", enumByValues.getValue());
+            }
 
             Integer maxNum = teamQuery.getMaxNum();
             if (maxNum != null && maxNum > 0) {
@@ -266,7 +270,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "队伍已满");
         }
 
-        RLock lock = redissonClient.getLock("partner:team_user:join");
+        RLock lock = redissonClient.getLock(RedisConstant.USER_JOIN_TEAM + teamId);
         try {
             if (lock.tryLock(10000, -1, TimeUnit.MILLISECONDS)) { // 10s的时间抢锁
                 System.out.println("getlock" + Thread.currentThread().getId());

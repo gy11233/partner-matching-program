@@ -121,7 +121,7 @@ public class TeamController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         boolean isAdmin = userService.isAdmin(request);
-        List<TeamUserVO> list = teamService.listTeams(teamQuery, isAdmin);
+        List<TeamUserVO> list = teamService.listTeams(teamQuery, isAdmin, 1);
         if (CollectionUtils.isEmpty(list)) {
             return  ResultUtils.success(list);
         }
@@ -201,7 +201,10 @@ public class TeamController {
         User loginUser = userService.getLoginUser(request);
         boolean isAdmin = userService.isAdmin(loginUser);
         teamQuery.setUserId(loginUser.getId());
-        List<TeamUserVO> list = teamService.listTeams(teamQuery, true);
+        List<TeamUserVO> list = teamService.listTeams(teamQuery, true, 0);
+        if (CollectionUtils.isEmpty(list)) {
+            return  ResultUtils.success(list);
+        }
         teamService.hasJoinTeam(list, request);
         // 统计每个小组的人数
         teamService.hasJoinTeamNum(list);
@@ -223,7 +226,10 @@ public class TeamController {
         Map<Long, List<UserTeam>> listMap = userTeamList.stream().collect(Collectors.groupingBy(UserTeam::getTeamId));
         List<Long> idlist = new ArrayList<>(listMap.keySet());
         teamQuery.setIdList(idlist);
-        List<TeamUserVO> list = teamService.listTeams(teamQuery, true);
+        List<TeamUserVO> list = teamService.listTeams(teamQuery, true, 0);
+        if (CollectionUtils.isEmpty(list)) {
+            return  ResultUtils.success(list);
+        }
         teamService.hasJoinTeam(list, request);
         // 统计每个小组的人数
         teamService.hasJoinTeamNum(list);
