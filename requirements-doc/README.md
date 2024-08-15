@@ -692,7 +692,7 @@ https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocke
 2. 列出所有好友 
 3. 搜索好友
 4. <mark>需不需要缓存来提速
-
+5. 对添加好友部分进行优化，如果已经是好友，添加按键是灰色的，不能添加,未登录不能显示添加按钮，每次添加成功后都删除缓存（因为这时好友状态已经改变）
 ### 修改匹配算法 
 目前没有修改
 

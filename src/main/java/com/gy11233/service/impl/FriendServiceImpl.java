@@ -2,6 +2,8 @@ package com.gy11233.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.github.rholder.retry.RetryException;
+import com.github.rholder.retry.Retryer;
 import com.gy11233.common.ErrorCode;
 
 import com.gy11233.contant.RedisConstant;
@@ -17,6 +19,7 @@ import com.gy11233.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -26,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -38,6 +43,7 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend>
     UserMapper userMapper;
 
     @Resource
+    @Lazy
     UserService userService;
 
     @Resource
@@ -48,6 +54,9 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend>
 
     @Resource
     RedissonClient redissonClient;
+
+    @Resource
+    private Retryer<Boolean> retryer;
 
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -91,6 +100,19 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend>
                friendByFriendId.setFriendId(userId);
                // 写入数据库
                result2 = this.save(friendByFriendId);
+               // 删除缓存 好友的缓存和自己的缓存都变了，直接删除缓存
+               Set<String> keys = stringRedisTemplate.keys(RedisConstant.USER_RECOMMEND_KEY + ":*");
+               for (String key : keys) {
+                   try {
+                       retryer.call(() -> stringRedisTemplate.delete(key));
+                   } catch (ExecutionException e) {
+                       log.error("用户注册后删除缓存重试时失败");
+                       throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+                   } catch (RetryException e) {
+                       log.error("用户注册后删除缓存达到最大重试次数或超过时间限制");
+                       throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+                   }
+               }
            }
         } catch (InterruptedException e) {
             log.error("addUser error", e);

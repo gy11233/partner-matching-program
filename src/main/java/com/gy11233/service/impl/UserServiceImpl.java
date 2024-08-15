@@ -7,11 +7,14 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.gy11233.contant.RedisConstant;
 import com.gy11233.mannger.RateLimiter;
+import com.gy11233.model.domain.Friend;
 import com.gy11233.model.domain.User;
 import com.gy11233.common.ErrorCode;
 import com.gy11233.exception.BusinessException;
 import com.gy11233.model.request.UserRegisterRequest;
+import com.gy11233.model.vo.UserFriendsVo;
 import com.gy11233.model.vo.UserVO;
+import com.gy11233.service.FriendService;
 import com.gy11233.service.UserService;
 import com.gy11233.mapper.UserMapper;
 import com.gy11233.utils.AlgorithmUtils;
@@ -66,6 +69,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Resource
     private Retryer<Boolean> retryer;
+
+    @Resource
+    private FriendService friendService;
 
     /**
      * 盐值，混淆密码
@@ -304,6 +310,59 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return userVO;
     }
 
+    public UserFriendsVo getUserFriendsVo(User user, User originUser) {
+        if (user == null) {
+            return null;
+        }
+        UserFriendsVo userfriendsV0 = new UserFriendsVo();
+        userfriendsV0.setId(user.getId());
+        userfriendsV0.setUsername(user.getUsername());
+        userfriendsV0.setUserAccount(user.getUserAccount());
+        userfriendsV0.setAvatarUrl(user.getAvatarUrl());
+        userfriendsV0.setGender(user.getGender());
+        userfriendsV0.setPhone(user.getPhone());
+        userfriendsV0.setEmail(user.getEmail());
+        userfriendsV0.setUserStatus(user.getUserStatus());
+        userfriendsV0.setCreateTime(user.getCreateTime());
+        userfriendsV0.setUpdateTime(user.getUpdateTime());
+        userfriendsV0.setUserRole(user.getUserRole());
+        userfriendsV0.setPlanetCode(user.getPlanetCode());
+        userfriendsV0.setTags(user.getTags());
+        if (originUser == null) {
+            userfriendsV0.setDistance(null);
+        }
+        else {
+            String redisUserGeoKey = RedisConstant.USER_GEO_KEY;
+            // 计算user距离originUser的距离
+            // todo:是否应该改成数据库操作
+            Distance distance = stringRedisTemplate.opsForGeo().distance(redisUserGeoKey,
+                    String.valueOf(originUser.getId()), String.valueOf(user.getId()),
+                    RedisGeoCommands.DistanceUnit.KILOMETERS);
+            if (distance == null) {
+                userfriendsV0.setDistance(null);
+            }
+            else {
+                userfriendsV0.setDistance(distance.getValue());
+
+            }
+        }
+        if (originUser == null) {
+            userfriendsV0.setIsFriends(2); // 未登录
+            return userfriendsV0;
+        }
+        QueryWrapper<Friend> friendQueryWrapper = new QueryWrapper<>();
+        friendQueryWrapper.eq("user_id", originUser.getId());
+        friendQueryWrapper.eq("friend_id", user.getId());
+        List<Friend> list = friendService.list(friendQueryWrapper);
+        if (CollectionUtils.isEmpty(list)) {
+            userfriendsV0.setIsFriends(0); // 不是好友
+        }
+        else {
+            userfriendsV0.setIsFriends(1); // 是好友
+        }
+        return userfriendsV0;
+    }
+
     /**
      * 用户注销
      *
@@ -390,7 +449,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
-    public synchronized List<UserVO> recommendUsers(long pageSize, long pageNum, User user) {
+    public synchronized List<UserFriendsVo> recommendUsers(long pageSize, long pageNum, User user) {
         // 如果user没有登录 key设置为默认的结果
         String key;
         if (user == null) {
@@ -420,7 +479,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             // 有数据直接返回
             // 将查询的缓存反序列化为 User 对象
             return userVOJsonListRedis.stream()
-                    .map(UserServiceImpl::transferToUserVO).collect(Collectors.toList());
+                    .map(UserServiceImpl::transferToUserFriendsVO).collect(Collectors.toList());
         }
         // 缓存无数据再走数据库
         else {
@@ -432,11 +491,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             Page<User> page = this.page(new Page<>(pageNum, pageSize), queryWrapper);
             List<User> userList = page.getRecords();
             // 将User转换为UserVO，在进行序列化
-            List<UserVO> userVOList = userList.stream()
-                    .map(user1 -> getUserVo(user1, user))
+            List<UserFriendsVo> userFriendV0 = userList.stream()
+                    .map(user1 -> getUserFriendsVo(user1, user))
                     .collect(Collectors.toList());
             // 将序列化的 List 写入缓存
-            List<String> userVOJsonList = userVOList.stream().map(JSONUtil::toJsonStr).collect(Collectors.toList());
+            List<String> userVOJsonList = userFriendV0.stream().map(JSONUtil::toJsonStr).collect(Collectors.toList());
             try {
                 stringRedisTemplate.opsForList().rightPushAll(key, userVOJsonList);
                 stringRedisTemplate.expire(key, 1, TimeUnit.HOURS);
@@ -444,7 +503,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 log.error("redis set key error", e);
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "缓存写入失败");
             }
-            return userVOList;
+            return userFriendV0;
         }
 
     }
@@ -475,7 +534,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
-    public List<UserVO> matchUsers(int num, User loginUser) {
+    public List<UserFriendsVo> matchUsers(int num, User loginUser) {
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.select("id", "tags");
         // 去除tags为空的用户
@@ -512,11 +571,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 1, 3, 2
         // User1、User2、User3
         // 1 => User1, 2 => User2, 3 => User3
-        Map<Long, List<UserVO>> userIdUserListMap = this.list(userQueryWrapper)
+        Map<Long, List<UserFriendsVo>> userIdUserListMap = this.list(userQueryWrapper)
                 .stream()
-                .map(user -> getUserVo(user, loginUser))
-                .collect(Collectors.groupingBy(UserVO::getId));
-        List<UserVO> finalUserList = new ArrayList<>();
+                .map(user -> getUserFriendsVo(user, loginUser))
+                .collect(Collectors.groupingBy(UserFriendsVo::getId));
+        List<UserFriendsVo> finalUserList = new ArrayList<>();
         for (Long userId : userIdList) {
             finalUserList.add(userIdUserListMap.get(userId).get(0));
         }
@@ -524,7 +583,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
-    public List<UserVO> searchNearby(int radius, User loginUser) {
+    public List<UserFriendsVo> searchNearby(int radius, User loginUser) {
         String geoKey = RedisConstant.USER_GEO_KEY;
         String userId = String.valueOf(loginUser.getId());
         Double longitude = loginUser.getLongitude();
@@ -543,22 +602,26 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 userIdList.add(Long.parseLong(id));
             }
         }
-        List<UserVO> userVOList = userIdList.stream().map(
+        List<UserFriendsVo> userVOList = userIdList.stream().map(
                 id -> {
-                    UserVO userVO = new UserVO();
+//                    UserFriendsVo userVO = new UserFriendsVo();
                     User user = this.getById(id);
-                    BeanUtils.copyProperties(user, userVO);
-                    Distance distance = stringRedisTemplate.opsForGeo().distance(geoKey, userId, String.valueOf(id),
-                            RedisGeoCommands.DistanceUnit.KILOMETERS);
-                    userVO.setDistance(distance.getValue());
-                    return userVO;
+//                    BeanUtils.copyProperties(user, userVO);
+//                    Distance distance = stringRedisTemplate.opsForGeo().distance(geoKey, userId, String.valueOf(id),
+//                            RedisGeoCommands.DistanceUnit.KILOMETERS);
+//                    userVO.setDistance(distance.getValue());
+                    return getUserFriendsVo(user, loginUser);
                 }
         ).collect(Collectors.toList());
-        return userVOList;
+        return userVOList.stream().filter(userFriendsVo -> userFriendsVo.getDistance()!=null).collect(Collectors.toList());
     }
 
     private static UserVO transferToUserVO(String userVOJson) {
         return JSONUtil.toBean(userVOJson, UserVO.class);
+    }
+
+    private static UserFriendsVo transferToUserFriendsVO(String userVOJson) {
+        return JSONUtil.toBean(userVOJson, UserFriendsVo.class);
     }
 
 

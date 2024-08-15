@@ -8,6 +8,7 @@ import com.gy11233.exception.BusinessException;
 import com.gy11233.model.domain.User;
 import com.gy11233.model.request.UserLoginRequest;
 import com.gy11233.model.request.UserRegisterRequest;
+import com.gy11233.model.vo.UserFriendsVo;
 import com.gy11233.model.vo.UserVO;
 import com.gy11233.service.UserService;
 import org.apache.commons.lang3.StringUtils;
@@ -175,7 +176,7 @@ public class UserController {
      */
     // todo:推荐的用户是随机的 需要完善
     @GetMapping("/recommend")
-    public BaseResponse<List<UserVO>> recommendUsers(long pageSize, long pageNum, HttpServletRequest request){
+    public BaseResponse<List<UserFriendsVo>> recommendUsers(long pageSize, long pageNum, HttpServletRequest request){
         // 通过userId查看redis中是否有对应的信息
         User userObj = (User)request.getSession().getAttribute(USER_LOGIN_STATE);
         return ResultUtils.success(userService.recommendUsers(pageSize, pageNum, userObj));
@@ -186,12 +187,12 @@ public class UserController {
      * 获取最匹配的用户
      */
     @GetMapping("/match")
-    public BaseResponse<List<UserVO>> matchUsers(int num, HttpServletRequest request) {
+    public BaseResponse<List<UserFriendsVo>> matchUsers(int num, HttpServletRequest request) {
         if (num <= 0 || num >20) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        List<UserVO> userList = userService.matchUsers(num, loginUser);
+        List<UserFriendsVo> userList = userService.matchUsers(num, loginUser);
         return ResultUtils.success(userList);
     }
 
@@ -199,13 +200,13 @@ public class UserController {
      * 搜索附近用户
      */
     @GetMapping("/searchNearby")
-    public BaseResponse<List<UserVO>> searchNearby(int radius, HttpServletRequest request) {
+    public BaseResponse<List<UserFriendsVo>> searchNearby(int radius, HttpServletRequest request) {
         if (radius <= 0 || radius > 10000) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User user = userService.getLoginUser(request);
         User loginUser = userService.getById(user.getId());
-        List<UserVO> userVOList = userService.searchNearby(radius, loginUser);
+        List<UserFriendsVo> userVOList = userService.searchNearby(radius, loginUser);
         return ResultUtils.success(userVOList);
     }
 

@@ -3,6 +3,7 @@ package com.gy11233.service;
 import com.gy11233.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.gy11233.model.request.UserRegisterRequest;
+import com.gy11233.model.vo.UserFriendsVo;
 import com.gy11233.model.vo.UserVO;
 
 import javax.servlet.http.HttpServletRequest;
@@ -59,7 +60,7 @@ public interface UserService extends IService<User> {
 
     int updateUser(User user, User currentUser);
 
-    List<UserVO> recommendUsers(long pageSize, long pageNum, User user);
+    List<UserFriendsVo> recommendUsers(long pageSize, long pageNum, User user);
 
     /**
      * 是否为管理员
@@ -77,10 +78,10 @@ public interface UserService extends IService<User> {
     /**
      * 匹配最合适的num个用户
      * @param num
-     * @param user
+     *
      * @return
      */
-    List<UserVO> matchUsers(int num, User loginUser);
+    List<UserFriendsVo> matchUsers(int num, User loginUser);
 
-    List<UserVO> searchNearby(int radius, User loginUser);
+    List<UserFriendsVo> searchNearby(int radius, User loginUser);
 }
