@@ -12,7 +12,7 @@ spring:
     password: '!@#q123456'
   # session 失效时间
   session:
-    timeout: 86400
+    timeout: 86400 # 设置session过期时间 s 2.4小时
     store-type: redis  #配置session的存储方式
   mvc:
     path match:

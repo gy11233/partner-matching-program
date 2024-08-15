@@ -1,4 +1,5 @@
 package com.gy11233.service.impl;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -162,23 +163,26 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         updateUser.setPlanetCode(String.valueOf(userId));
         boolean updateResult = this.updateById(updateUser);
         // 用户注册后对标签进行缓存
-        // todo: 这一步的意义是？？？ 配合缓存吗
         if (!updateResult) {
-            log.info("{}用户星球编号设置失败", userId);
-        } else {
-            Set<String> keys = stringRedisTemplate.keys(RedisConstant.USER_RECOMMEND_KEY + ":*");
-            for (String key : keys) {
-                try {
-                    retryer.call(() -> stringRedisTemplate.delete(key));
-                } catch (ExecutionException e) {
-                    log.error("用户注册后删除缓存重试时失败");
-                    throw new BusinessException(ErrorCode.SYSTEM_ERROR);
-                } catch (RetryException e) {
-                    log.error("用户注册后删除缓存达到最大重试次数或超过时间限制");
-                    throw new BusinessException(ErrorCode.SYSTEM_ERROR);
-                }
-            }
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "注册失败");
         }
+        // todo: 这一步的意义是？？？ 配合缓存吗
+//        if (!updateResult) {
+//            log.info("{}用户星球编号设置失败", userId);
+//        } else {
+//            Set<String> keys = stringRedisTemplate.keys(RedisConstant.USER_RECOMMEND_KEY + ":*");
+//            for (String key : keys) {
+//                try {
+//                    retryer.call(() -> stringRedisTemplate.delete(key));
+//                } catch (ExecutionException e) {
+//                    log.error("用户注册后删除缓存重试时失败");
+//                    throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+//                } catch (RetryException e) {
+//                    log.error("用户注册后删除缓存达到最大重试次数或超过时间限制");
+//                    throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+//                }
+//            }
+//        }
         return userId;
     }
 
@@ -386,7 +390,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
-    public List<UserVO> recommendUsers(long pageSize, long pageNum, User user) {
+    public synchronized List<UserVO> recommendUsers(long pageSize, long pageNum, User user) {
         // 如果user没有登录 key设置为默认的结果
         String key;
         if (user == null) {
@@ -407,27 +411,42 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             }
             key = RedisConstant.USER_RECOMMEND_KEY + ":" + user.getId();
         }
+        // 如果缓存中有数据，直接读缓存
+        long start = (pageNum - 1) * pageSize;
+        long end = start + pageSize - 1;
+        List<String> userVOJsonListRedis = stringRedisTemplate.opsForList().range(key, start, end);
+        // 判断 Redis 中是否有数据
+        if (!CollectionUtils.isEmpty(userVOJsonListRedis)) {
+            // 有数据直接返回
+            // 将查询的缓存反序列化为 User 对象
+            return userVOJsonListRedis.stream()
+                    .map(UserServiceImpl::transferToUserVO).collect(Collectors.toList());
+        }
+        // 缓存无数据再走数据库
+        else {
+            // 无缓存，查询数据库，并将数据写入缓存
+            QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+            if (user != null) {
+                queryWrapper.ne("id", user.getId());
+            }
+            Page<User> page = this.page(new Page<>(pageNum, pageSize), queryWrapper);
+            List<User> userList = page.getRecords();
+            // 将User转换为UserVO，在进行序列化
+            List<UserVO> userVOList = userList.stream()
+                    .map(user1 -> getUserVo(user1, user))
+                    .collect(Collectors.toList());
+            // 将序列化的 List 写入缓存
+            List<String> userVOJsonList = userVOList.stream().map(JSONUtil::toJsonStr).collect(Collectors.toList());
+            try {
+                stringRedisTemplate.opsForList().rightPushAll(key, userVOJsonList);
+                stringRedisTemplate.expire(key, 1, TimeUnit.HOURS);
+            } catch (Exception e) {
+                log.error("redis set key error", e);
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "缓存写入失败");
+            }
+            return userVOList;
+        }
 
-        ValueOperations<String, Object> operations = redisTemplate.opsForValue();
-        Page<User> page = (Page<User>)operations.get(key);
-        // 有缓存直接返回缓存
-        if (page != null) {
-            return page.getRecords().stream().map(user1 -> getUserVo(user1, user)).collect(Collectors.toList());
-        }
-        // 没有缓存查询并加入缓存
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        // 只有当用户登录了，才不能查出用户的信息作为推荐
-        if (user != null){
-            queryWrapper.ne("id", user.getId());
-        }
-        Page<User> list = page(new Page<>(pageNum, pageSize), queryWrapper);
-        try {
-            operations.set(key, list, 100000, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            log.error("redis set key error", e);
-        }
-        List<User> userList = list.getRecords();
-        return userList.stream().map(user1 -> getUserVo(user1, user)).collect(Collectors.toList());
     }
 
     @Override
@@ -536,6 +555,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 }
         ).collect(Collectors.toList());
         return userVOList;
+    }
+
+    private static UserVO transferToUserVO(String userVOJson) {
+        return JSONUtil.toBean(userVOJson, UserVO.class);
     }
 
 

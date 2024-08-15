@@ -570,7 +570,7 @@ partner:precachejob:docache:lock
     - 多服务器的问题怎么办？用分布式锁？
    
 
-## v2.0.0版本优化
+## v1.1.0版本优化
 ### 调整数据库格式，和新版本对应
 #### 用户注册
 1.  redisLimiterManager.doRateLimiter限流：分布式限流
@@ -692,14 +692,21 @@ https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocke
 2. 列出所有好友 
 3. 搜索好友
 4. <mark>需不需要缓存来提速
-### 增加加好友功能
-
 
 ### 修改匹配算法 
+目前没有修改
+
+<mark>之后任务
+- 了解余弦分词算法 Jaccard相似度算法
+- 了解knn
+- 知道这些的区别 目前来看用编辑距离就可以
 knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master 
 
-### 解决部分查询慢的问题
+### redis list结构实现滑动窗口
 
+
+### 解决部分查询慢的问题
+redis session的清理方式??? 设置过期时间 spring.session.timeout
 
 
 ----
