@@ -61,6 +61,7 @@ public class ChatServiceImpl extends ServiceImpl<ChatMapper, Chat>
         }
         List<ChatMessageVO> chatRecords = getCache(CACHE_CHAT_PRIVATE, loginUser.getId() + String.valueOf(toId));
         if (chatRecords != null) {
+            log.info("根据用户缓存加载聊天内容");
             saveCache(CACHE_CHAT_PRIVATE, loginUser.getId() + String.valueOf(toId), chatRecords);
             return chatRecords;
         }
