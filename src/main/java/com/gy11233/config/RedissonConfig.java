@@ -24,12 +24,14 @@ public class RedissonConfig {
 
     private int redissonDB;
 
+    private String password;
+
     @Bean
     public RedissonClient redissonClient(){
         // 1.创建配置
         Config config = new Config();
         String redissonAddress = String.format("redis://%s:%s", host, port);
-        config.useSingleServer().setAddress(redissonAddress).setDatabase(redissonDB);
+        config.useSingleServer().setAddress(redissonAddress).setDatabase(redissonDB).setPassword(password);
         // 2. 获取实例
         return Redisson.create(config);
     }

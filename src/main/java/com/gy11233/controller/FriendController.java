@@ -21,7 +21,7 @@ import java.util.List;
 @RestController
 @Slf4j
 @RequestMapping("/friend")
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials="true") // 解决跨域
+//@CrossOrigin(origins = "http://localhost:5173", allowCredentials="true") // 解决跨域
 public class FriendController {
 
     @Resource

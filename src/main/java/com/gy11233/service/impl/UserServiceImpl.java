@@ -496,6 +496,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                     .collect(Collectors.toList());
             // 将序列化的 List 写入缓存
             List<String> userVOJsonList = userFriendV0.stream().map(JSONUtil::toJsonStr).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(userVOJsonList)) {
+                return userFriendV0;
+            }
             try {
                 stringRedisTemplate.opsForList().rightPushAll(key, userVOJsonList);
                 stringRedisTemplate.expire(key, 1, TimeUnit.HOURS);

@@ -28,7 +28,7 @@ import static com.gy11233.contant.UserConstant.USER_LOGIN_STATE;
  */
 @RestController
 @RequestMapping("/user")
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials="true") // 解决跨域
+//@CrossOrigin(origins = "http://localhost:5173", allowCredentials="true") // 解决跨域
 //@CrossOrigin // 解决跨域
 public class UserController {
 

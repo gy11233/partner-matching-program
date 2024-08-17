@@ -4,11 +4,12 @@ database if not exists partner;
 use
 partner;
 
+drop table user;
 -- 用户表
 create table user
 (
     id           bigint auto_increment comment 'id' primary key,
-    name     varchar(256) null comment '用户昵称',
+    username     varchar(256) null comment '用户昵称',
     user_account  varchar(256) null comment '账号',
     avatar_url    varchar(1024) null comment '用户头像' default 'https://www.keaitupian.cn/cjpic/frombd/0/253/17551321/2476952379.jpg',
     gender       tinyint null comment '性别',

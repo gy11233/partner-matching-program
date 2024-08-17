@@ -26,7 +26,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/chat")
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials="true") // 解决跨域
+//@CrossOrigin(origins = "http://localhost:5173", allowCredentials="true") // 解决跨域
 @Api(tags = "聊天管理模块")
 public class ChatController {
     /**
