@@ -25,18 +25,20 @@
 4. 数据库全都是假数据，需要造一些真的数据
 5. 没有统一的权限管理
 
-### v2.0.0
+### v1.1.0
 目标
 1. 增加用户注册功能
 2. 增加聊天功能  可以参考https://github.com/Zhaosml/PartnerMatching.git
 3. 修改匹配算法 knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master
 4. 解决部分查询慢的问题
 
-### v2.1.0
+### v1.2.0
 目标
-1. aop加配置注解实现布隆过滤器
-   http://doc.ochiamalu.top/
-2. 进一步优化
+1. aop加配置注解实现全局拦截和日志功能
+2. 解决redis的各种问题
+    - 缓存穿透
+    - 缓存雪崩 
+    参考   http://doc.ochiamalu.top/
 
 ## 技术栈
 ### 前端
@@ -733,6 +735,20 @@ knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master
 
 ## v1.2.0版本优化
 ### aop
+- 完成全局登录拦截
+- 完成log日志输出
+### redis缓存各种问题
+1. 缓存穿透
+    存在这个需求吗？针对比较具体的查询需要缓存穿透
+参考 http://doc.ochiamalu.top/
+2. 雪崩
+3. 缓存穿透
+
+### 页面优化
+1. 系统名字修改
+2. 图片修改
+
+### 使用优先队列减少topN运算过程中的内存占用
 
 
 ### todo:加入头像上传和验证码注册功能
@@ -747,7 +763,7 @@ knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master
    - sql与内存结合，比如用sql先过滤到一部分tag
    - **之后可以多放数据选择合适的**
 3. java8 parallelStream 去了解一下
-4. session 和 cookie区别
+4. session 和 cookie区别 还可以自己设置token存储在redis中和加在请求头里
 5. session存在redis中什么时候进行删除清理库  **目前解决方案：设置过期时间解决 但是还未解决**
 6. 对比之前request.getSession().setAttribute(USER_LOGIN_STATE, safetyUser)
 的实现方式和换成redis存储的方式
@@ -761,3 +777,9 @@ knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master
 14. 根据加入队伍来实现匹配？可以进一步实现，考虑knn实现的算法
 15. 思考推荐算法，可以思考一下大数据的排序策略 检索=》召回=》粗排=》精排
 16. 使用邮箱注册 https://blog.csdn.net/qq_42263280/article/details/129584017
+17. 可以定义一个专门刷新redis的拦截器
+18. aop 拦截器 的区别？？项目中用的aop
+19. redis更新和数据库更新加事务管理：recommend中加入了线程安全 思考缓存更新策略
+20. 思考recommend 推荐策略 不能每次都一样吧 心动模式可以有好友吗
+21. 学习事务失效的情况 比如this.method()
+22. 推荐接口的优化？使用优先队列进行优化

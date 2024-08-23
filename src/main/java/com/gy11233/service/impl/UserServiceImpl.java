@@ -449,6 +449,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
+    // todo:是不是可以把synchronized换成分布式锁？？
     public synchronized List<UserFriendsVo> recommendUsers(long pageSize, long pageNum, User user) {
         // 如果user没有登录 key设置为默认的结果
         String key;
