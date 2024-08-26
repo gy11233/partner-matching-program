@@ -15,6 +15,7 @@ public class RedisTemplateConfig {
         RedisTemplate<String, Object> stringObjectRedisTemplate = new RedisTemplate<>();
         stringObjectRedisTemplate.setConnectionFactory(redisConnectionFactory);
         stringObjectRedisTemplate.setKeySerializer(RedisSerializer.string());
+//        stringObjectRedisTemplate.setEnableTransactionSupport(true); // 打开支持事务
         return stringObjectRedisTemplate;
     }
 }
