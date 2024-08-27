@@ -775,7 +775,7 @@ knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master
 12. 队伍列表查询扩展到查询队伍所有成员的信息
 13. 加入队伍 重复加入队伍问题 疯狂点击还是可能加入 分布式锁来解决
 14. 根据加入队伍来实现匹配？可以进一步实现，考虑knn实现的算法
-15. 思考推荐算法，可以思考一下大数据的排序策略 检索=》召回=》粗排=》精排
+15. 思考推荐算法，可以思考一下大数据的排序策略 检索=》召回=》粗排=》精排 https://github.com/datawhalechina/fun-rec/blob/master/docs/ch01/ch1.3.md
 16. 使用邮箱注册 https://blog.csdn.net/qq_42263280/article/details/129584017
 17. 可以定义一个专门刷新redis的拦截器
 18. aop 拦截器 的区别？？项目中用的aop
@@ -783,3 +783,4 @@ knn可能会参考到https://github.com/dnwwdwd/homieMatching/tree/master
 20. 思考recommend 推荐策略 不能每次都一样吧 心动模式可以有好友吗
 21. 学习事务失效的情况 比如this.method()
 22. 推荐接口的优化？使用优先队列进行优化
+23. redis需不需要用线程池

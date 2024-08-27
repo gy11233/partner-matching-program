@@ -539,17 +539,26 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Override
     public List<UserFriendsVo> matchUsers(int num, User loginUser) {
+//        int soreThreshold =
+        // 获取当前时间
+        long startTime = System.currentTimeMillis();
+        // todo:进行分页查询
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.select("id", "tags");
         // 去除tags为空的用户
         queryWrapper.isNotNull("tags");
         List<User> userList = this.list(queryWrapper);
+
+        long time1 = System.currentTimeMillis();
+        log.info("matchUsers get all users cost time: {}", time1 - startTime);
+
         String tags = loginUser.getTags();
         Gson gson = new Gson();
         List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>() {
         }.getType());
         // 用户列表 => 相似度
-        List<Pair<User, Long>> list = new ArrayList<>();
+        // 只维护top num个用户
+        Queue<Pair<User, Long>> listTop = new PriorityQueue<>((o1, o2) -> -Long.compare(o1.getValue(), o2.getValue()));
         // 依次计算所有用户和当前用户的相似度
         for (User user : userList) {
             String userTags = user.getTags();
@@ -561,15 +570,31 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             }.getType());
             // 计算分数
             long distance = AlgorithmUtils.minDistance(tagList, userTagList);
-            list.add(new Pair<>(user, distance));
+            // 加入优先队列
+            log.info(listTop.toString());
+            if (listTop.isEmpty() || listTop.size() < num) {
+                listTop.offer(new Pair<>(user, distance));
+            }
+            else {
+                Pair<User, Long> lastPair = listTop.poll();
+
+                if (lastPair.getValue() > distance) {
+                    // 新节点比最小节点优先值大时 加入队列
+                    listTop.offer(new Pair<>(user, distance));
+                }
+                else {
+                    listTop.offer(lastPair);
+                }
+            }
         }
+        List<Long> userIdList = new ArrayList<>();
         // 按编辑距离由小到大排序
-        List<Pair<User, Long>> topUserPairList = list.stream()
-                .sorted((a, b) -> (int) (a.getValue() - b.getValue()))
-                .limit(num)
-                .collect(Collectors.toList());
-        // 原本顺序的 userId 列表
-        List<Long> userIdList = topUserPairList.stream().map(pair -> pair.getKey().getId()).collect(Collectors.toList());
+        while (!listTop.isEmpty()) {
+            Pair<User, Long> pair = listTop.poll();
+            userIdList.add(pair.getKey().getId());
+        }
+        Collections.reverse(userIdList);
+
         QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
         userQueryWrapper.in("id", userIdList);
         // 1, 3, 2
@@ -580,9 +605,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 .map(user -> getUserFriendsVo(user, loginUser))
                 .collect(Collectors.groupingBy(UserFriendsVo::getId));
         List<UserFriendsVo> finalUserList = new ArrayList<>();
+        // 安装匹配度顺序返回
         for (Long userId : userIdList) {
             finalUserList.add(userIdUserListMap.get(userId).get(0));
         }
+        long time2 = System.currentTimeMillis();
+        log.info("matchUsers cost time: {}", time2 - startTime);
         return finalUserList;
     }
 
