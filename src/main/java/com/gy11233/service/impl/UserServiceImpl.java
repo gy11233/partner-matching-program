@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.gy11233.common.PageRequest;
 import com.gy11233.contant.RedisConstant;
 import com.gy11233.mannger.RateLimiter;
 import com.gy11233.model.domain.Friend;
@@ -539,54 +540,102 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Override
     public List<UserFriendsVo> matchUsers(int num, User loginUser) {
-//        int soreThreshold =
-        // 获取当前时间
-        long startTime = System.currentTimeMillis();
-        // todo:进行分页查询
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.select("id", "tags");
-        // 去除tags为空的用户
-        queryWrapper.isNotNull("tags");
-        List<User> userList = this.list(queryWrapper);
+        // 距离阈值 推荐用户需要小于此阈值
+        final int distanceThreshold = 4;
+        final int numThreshold = 10000;
+        // 获取当前数据的总量 如果缓存中有直接从缓存中获取
+        String userCountKey = RedisConstant.USER_COUNT_KEY;
+        Long count = (Long) redisTemplate.opsForValue().get(userCountKey);
+        if (count == null) {
+            count = this.count();
+            redisTemplate.opsForValue().set(userCountKey, count);
+        }
 
-        long time1 = System.currentTimeMillis();
-        log.info("matchUsers get all users cost time: {}", time1 - startTime);
 
-        String tags = loginUser.getTags();
-        Gson gson = new Gson();
-        List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>() {
-        }.getType());
-        // 用户列表 => 相似度
-        // 只维护top num个用户
+        List<User> userList;
+        // 分页查询的参数
+        Random random = new Random();
+        int mod = (int) Math.ceil((double) count / numThreshold );
+        int pageNum = random.nextInt(mod);
+        int pageSize = numThreshold;
+
+        // 只维护top num个用户的优先队列
         Queue<Pair<User, Long>> listTop = new PriorityQueue<>((o1, o2) -> -Long.compare(o1.getValue(), o2.getValue()));
-        // 依次计算所有用户和当前用户的相似度
-        for (User user : userList) {
-            String userTags = user.getTags();
-            // 无标签或者为当前用户自己
-            if (StringUtils.isBlank(userTags) || user.getId() == loginUser.getId()) {
-                continue;
-            }
-            List<String> userTagList = gson.fromJson(userTags, new TypeToken<List<String>>() {
-            }.getType());
-            // 计算分数
-            long distance = AlgorithmUtils.minDistance(tagList, userTagList);
-            // 加入优先队列
-            log.info(listTop.toString());
-            if (listTop.isEmpty() || listTop.size() < num) {
-                listTop.offer(new Pair<>(user, distance));
+
+        // 尝试次数
+        int tryNum = 0;
+        final int tryNumMax = 10;
+        while (true){
+            if (count < numThreshold) {
+                // 如果总量小于numThreshold 直接查询全部的数据
+                QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+                queryWrapper.select("id", "tags");
+                // 去除tags为空的用户
+                queryWrapper.isNotNull("tags");
+                userList = this.list(queryWrapper);
             }
             else {
-                Pair<User, Long> lastPair = listTop.poll();
+                // 如果总量大于numThreshold 随机查询1万个用户信息的数据
+                QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+                queryWrapper.select("id", "tags");
+                queryWrapper.isNotNull("tags");
+                Page<User> page = this.page(new Page<>((pageNum + tryNum) % mod + 1, pageSize), queryWrapper);
+                userList = page.getRecords();
+            }
 
-                if (lastPair.getValue() > distance) {
-                    // 新节点比最小节点优先值大时 加入队列
+
+
+//            long time1 = System.currentTimeMillis();
+//            log.info("matchUsers get all users cost time: {}", time1 - startTime);
+
+            String tags = loginUser.getTags();
+            Gson gson = new Gson();
+            List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>() {
+            }.getType());
+            // 用户列表 => 相似度
+            // 依次计算所有用户和当前用户的相似度
+            for (User user : userList) {
+                String userTags = user.getTags();
+                // 无标签或者为当前用户自己
+                if (StringUtils.isBlank(userTags) || user.getId() == loginUser.getId()) {
+                    continue;
+                }
+                List<String> userTagList = gson.fromJson(userTags, new TypeToken<List<String>>() {
+                }.getType());
+                // 计算分数
+                long distance = AlgorithmUtils.minDistance(tagList, userTagList);
+                // 加入优先队列
+                if (listTop.isEmpty() || listTop.size() < num) {
                     listTop.offer(new Pair<>(user, distance));
                 }
                 else {
-                    listTop.offer(lastPair);
+                    Pair<User, Long> lastPair = listTop.poll();
+
+                    if (lastPair.getValue() > distance) {
+                        // 新节点比最小节点优先值大时 加入队列
+                        listTop.offer(new Pair<>(user, distance));
+                    }
+                    else {
+                        listTop.offer(lastPair);
+                    }
                 }
             }
+            // 用了分页查找但是找到的用户相似度不满足numThreshold阈值设置 需要反复查找
+            if(listTop.isEmpty() || listTop.peek().getValue() < distanceThreshold || count < numThreshold){
+                break;
+            }
+            if(tryNum > tryNumMax) {
+                break;
+            }
+            else {
+                // 取出listTop中不符合的用户
+                while(!listTop.isEmpty() && listTop.peek().getValue() > distanceThreshold) {
+                    listTop.poll();
+                }
+            }
+            tryNum ++;
         }
+
         List<Long> userIdList = new ArrayList<>();
         // 按编辑距离由小到大排序
         while (!listTop.isEmpty()) {
@@ -609,10 +658,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         for (Long userId : userIdList) {
             finalUserList.add(userIdUserListMap.get(userId).get(0));
         }
-        long time2 = System.currentTimeMillis();
-        log.info("matchUsers cost time: {}", time2 - startTime);
+//        long time2 = System.currentTimeMillis();
+//        log.info("matchUsers cost time: {}", time2 - startTime);
         return finalUserList;
     }
+
 
     @Override
     public List<UserFriendsVo> searchNearby(int radius, User loginUser) {
