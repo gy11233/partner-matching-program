@@ -7,6 +7,8 @@ public interface RedisConstant {
     String USER_ADD_KEY = "partner:user:add";
     String USER_RECOMMEND_KEY = "partner:user:recommend";
     String USER_COUNT_KEY = "partner:user:match:count";
+    String  USER_PRECACHE_JOB = "partner:precachejob:recommend:lock";
+
     public static final String LOGIN_USER_KEY = "partner:login:token:";
 
     public static final Long LOGIN_USER_TTL = 15L;

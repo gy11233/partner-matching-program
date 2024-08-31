@@ -162,7 +162,6 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             if (enumByValues == null) {
                 enumByValues = TeamStatusEnum.PUBLIC;
             }
-            // todo:这段逻辑需要在改一下，私密的房间如何展示
             if (!isAdmin && enumByValues.equals(TeamStatusEnum.PRIVATE)) {
                 throw new BusinessException(ErrorCode.NO_AUTH);
             }

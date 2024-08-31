@@ -503,7 +503,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             }
             try {
                 stringRedisTemplate.opsForList().rightPushAll(key, userVOJsonList);
-                stringRedisTemplate.expire(key, 1, TimeUnit.HOURS);
+                stringRedisTemplate.expire(key, 24, TimeUnit.HOURS);
             } catch (Exception e) {
                 log.error("redis set key error", e);
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "缓存写入失败");
@@ -548,7 +548,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         Long count = (Long) redisTemplate.opsForValue().get(userCountKey);
         if (count == null) {
             count = this.count();
-            redisTemplate.opsForValue().set(userCountKey, count);
+            redisTemplate.opsForValue().set(userCountKey, count, 24, TimeUnit.HOURS);
         }
 
 
@@ -582,11 +582,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 Page<User> page = this.page(new Page<>((pageNum + tryNum) % mod + 1, pageSize), queryWrapper);
                 userList = page.getRecords();
             }
-
-
-
-//            long time1 = System.currentTimeMillis();
-//            log.info("matchUsers get all users cost time: {}", time1 - startTime);
 
             String tags = loginUser.getTags();
             Gson gson = new Gson();

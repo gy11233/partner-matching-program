@@ -2,11 +2,13 @@ package com.gy11233.model.vo;
 
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.Date;
 
 @Data
-public class UserFriendsVo {
+public class UserFriendsVo implements Serializable {
 
+    private static final long serialVersionUID = -7235246619835901985L;
     /**
      * id
      */
