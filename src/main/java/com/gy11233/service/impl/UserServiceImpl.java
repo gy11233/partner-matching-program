@@ -22,9 +22,12 @@ import com.gy11233.utils.AlgorithmUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.math3.util.Pair;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.geo.*;
 import org.springframework.data.redis.connection.RedisGeoCommands;
+import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -46,6 +49,7 @@ import static com.gy11233.contant.UserConstant.ADMIN_ROLE;
 import static com.gy11233.contant.UserConstant.USER_LOGIN_STATE;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.redisson.api.RLock;
 
 /**
  * 用户服务实现类
@@ -73,6 +77,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Resource
     private FriendService friendService;
+
+    @Resource
+    private RedissonClient redissonClient;
 
     /**
      * 盐值，混淆密码
@@ -451,11 +458,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Override
     // todo:是不是可以把synchronized换成分布式锁？？
-    public synchronized List<UserFriendsVo> recommendUsers(long pageSize, long pageNum, User user) {
+    public List<UserFriendsVo> recommendUsers(long pageSize, long pageNum, User user) {
+
+
         // 如果user没有登录 key设置为默认的结果
         String key;
+        RLock lock;
         if (user == null) {
             key = RedisConstant.USER_RECOMMEND_KEY + ":" + "default";
+            lock = redissonClient.getLock(RedisConstant.USER_RECOMMEND_LOCK + ":default");
         }
         // 如果登录且合法，设置成id
         else{
@@ -471,46 +482,61 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 throw new BusinessException(ErrorCode.PARAMS_ERROR);
             }
             key = RedisConstant.USER_RECOMMEND_KEY + ":" + user.getId();
-        }
-        // 如果缓存中有数据，直接读缓存
-        long start = (pageNum - 1) * pageSize;
-        long end = start + pageSize - 1;
-        List<String> userVOJsonListRedis = stringRedisTemplate.opsForList().range(key, start, end);
-        // 判断 Redis 中是否有数据
-        if (!CollectionUtils.isEmpty(userVOJsonListRedis)) {
-            // 有数据直接返回
-            // 将查询的缓存反序列化为 User 对象
-            return userVOJsonListRedis.stream()
-                    .map(UserServiceImpl::transferToUserFriendsVO).collect(Collectors.toList());
-        }
-        // 缓存无数据再走数据库
-        else {
-            // 无缓存，查询数据库，并将数据写入缓存
-            QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-            if (user != null) {
-                queryWrapper.ne("id", user.getId());
-            }
-            Page<User> page = this.page(new Page<>(pageNum, pageSize), queryWrapper);
-            List<User> userList = page.getRecords();
-            // 将User转换为UserVO，在进行序列化
-            List<UserFriendsVo> userFriendV0 = userList.stream()
-                    .map(user1 -> getUserFriendsVo(user1, user))
-                    .collect(Collectors.toList());
-            // 将序列化的 List 写入缓存
-            List<String> userVOJsonList = userFriendV0.stream().map(JSONUtil::toJsonStr).collect(Collectors.toList());
-            if (CollectionUtils.isEmpty(userVOJsonList)) {
-                return userFriendV0;
-            }
-            try {
-                stringRedisTemplate.opsForList().rightPushAll(key, userVOJsonList);
-                stringRedisTemplate.expire(key, 24, TimeUnit.HOURS);
-            } catch (Exception e) {
-                log.error("redis set key error", e);
-                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "缓存写入失败");
-            }
-            return userFriendV0;
-        }
+            lock = redissonClient.getLock(RedisConstant.USER_RECOMMEND_LOCK + ":" + user.getId());
 
+        }
+        // 用redisson分布式锁
+        try {
+            if (lock.tryLock(3000, -1, TimeUnit.MILLISECONDS)) {
+                // 如果缓存中有数据，直接读缓存
+                long start = (pageNum - 1) * pageSize;
+                long end = start + pageSize - 1;
+                List<String> userVOJsonListRedis = stringRedisTemplate.opsForList().range(key, start, end);
+                // 判断 Redis 中是否有数据
+                if (!CollectionUtils.isEmpty(userVOJsonListRedis)) {
+                    // 有数据直接返回
+                    // 将查询的缓存反序列化为 User 对象
+                    return userVOJsonListRedis.stream()
+                            .map(UserServiceImpl::transferToUserFriendsVO).collect(Collectors.toList());
+                }
+                // 缓存无数据再走数据库
+                else {
+                    // 无缓存，查询数据库，并将数据写入缓存
+                    QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+                    if (user != null) {
+                        queryWrapper.ne("id", user.getId());
+                    }
+                    Page<User> page = this.page(new Page<>(pageNum, pageSize), queryWrapper);
+                    List<User> userList = page.getRecords();
+                    // 将User转换为UserVO，在进行序列化
+                    List<UserFriendsVo> userFriendV0 = userList.stream()
+                            .map(user1 -> getUserFriendsVo(user1, user))
+                            .collect(Collectors.toList());
+                    // 将序列化的 List 写入缓存
+                    List<String> userVOJsonList = userFriendV0.stream().map(JSONUtil::toJsonStr).collect(Collectors.toList());
+                    if (CollectionUtils.isEmpty(userVOJsonList)) {
+                        return userFriendV0;
+                    }
+                    try {
+                        stringRedisTemplate.opsForList().rightPushAll(key, userVOJsonList);
+                        stringRedisTemplate.expire(key, 24, TimeUnit.HOURS);
+                    } catch (Exception e) {
+                        log.error("redis set key error", e);
+                        throw new BusinessException(ErrorCode.SYSTEM_ERROR, "缓存写入失败");
+                    }
+                    return userFriendV0;
+                }
+            }
+        } catch (InterruptedException e) {
+            log.error("user recommend lock error");
+        } finally {
+            // 只能释放自己的锁
+            if (lock.isHeldByCurrentThread()) {
+                log.info("unlock{}", Thread.currentThread().getId());
+                lock.unlock();
+            }
+        }
+        return null;
     }
 
     @Override

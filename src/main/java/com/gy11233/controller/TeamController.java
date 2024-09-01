@@ -99,9 +99,9 @@ public class TeamController {
     /**
      * 根据id搜索队伍
      */
-    @GetMapping("/get")
-    public BaseResponse<Team> getTeam(long id) {
-        if (id <= 0) {
+    @GetMapping("/{id}")
+    public BaseResponse<Team> getTeam(@PathVariable Long id) {
+        if (id == null || id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         Team team = teamService.getById(id);
@@ -219,9 +219,13 @@ public class TeamController {
         User loginUser = userService.getLoginUser(request);
         long userId = loginUser.getId();
         boolean isAdmin = userService.isAdmin(loginUser);
+        // 查询队伍
         QueryWrapper<UserTeam> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId);
         List<UserTeam> userTeamList = userTeamService.list(queryWrapper);
+        if (CollectionUtils.isEmpty(userTeamList)) {
+            return ResultUtils.success(null);
+        }
         // 过滤到userTeamList中teamId重复的
         Map<Long, List<UserTeam>> listMap = userTeamList.stream().collect(Collectors.groupingBy(UserTeam::getTeamId));
         List<Long> idlist = new ArrayList<>(listMap.keySet());

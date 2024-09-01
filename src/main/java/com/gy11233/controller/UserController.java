@@ -11,6 +11,9 @@ import com.gy11233.model.request.UserRegisterRequest;
 import com.gy11233.model.vo.UserFriendsVo;
 import com.gy11233.model.vo.UserVO;
 import com.gy11233.service.UserService;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiImplicitParams;
+import io.swagger.annotations.ApiOperation;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
@@ -165,6 +168,20 @@ public class UserController {
         }
         int result = userService.updateUser(user, currentUser);
         return ResultUtils.success(result);
+    }
+
+    @GetMapping("/{id}")
+    public BaseResponse<UserVO> getUserById(@PathVariable Long id) {
+//        User loginUser = userService.getLoginUser(request);
+//        if (loginUser == null) {
+//            throw new BusinessException(ErrorCode.NOT_LOGIN);
+//        }
+        if (id == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User user = userService.getById(id);
+        UserVO userVO = userService.getUserVo(user, null);
+        return ResultUtils.success(userVO);
     }
 
     /**

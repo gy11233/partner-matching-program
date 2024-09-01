@@ -8,6 +8,7 @@ import com.gy11233.model.domain.User;
 import com.gy11233.model.vo.UserFriendsVo;
 import com.gy11233.service.UserService;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.ListOperations;
@@ -39,7 +40,14 @@ public class PreCacheJob {
     @Resource
     private RedissonClient redissonClient;
 
+    @Resource
+    RBloomFilter<Long> userBloomFilter;
+
     List<Long> importantUsers = Arrays.asList(1L, 2L, 3L, 8L);
+
+    /**
+     * 用户推荐列表缓存预热
+     */
     // 每天执行
     @Scheduled(cron = "0 0 3 * * *")
     public void DoPreCacheJob(){
@@ -81,6 +89,5 @@ public class PreCacheJob {
         }
 
     }
-
 
 }
