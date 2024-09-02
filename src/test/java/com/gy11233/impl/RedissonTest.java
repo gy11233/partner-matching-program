@@ -1,16 +1,12 @@
-package com.gy11233.service;
+package com.gy11233.impl;
 
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.gy11233.model.domain.User;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RList;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.redis.core.ValueOperations;
 
 import javax.annotation.Resource;
 import java.util.concurrent.TimeUnit;

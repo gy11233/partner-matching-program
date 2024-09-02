@@ -1,8 +1,7 @@
-package com.gy11233.service;
+package com.gy11233.impl;
 
-import com.gy11233.mapper.UserMapper;
 import com.gy11233.model.domain.User;
-import io.swagger.models.auth.In;
+import com.gy11233.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.util.StopWatch;

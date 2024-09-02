@@ -1,4 +1,4 @@
-package com.gy11233.service;
+package com.gy11233.impl;
 
 import com.gy11233.utils.AlgorithmUtils;
 import org.junit.jupiter.api.Test;

@@ -1,7 +1,5 @@
-package com.gy11233.service;
-import java.util.Date;
+package com.gy11233.impl;
 
-import com.gy11233.config.RedisTemplateConfig;
 import com.gy11233.model.domain.User;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
