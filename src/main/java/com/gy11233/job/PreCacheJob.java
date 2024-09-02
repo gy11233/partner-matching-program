@@ -17,7 +17,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -40,10 +42,20 @@ public class PreCacheJob {
     @Resource
     private RedissonClient redissonClient;
 
-    @Resource
-    RBloomFilter<Long> userBloomFilter;
 
-    List<Long> importantUsers = Arrays.asList(1L, 2L, 3L, 8L);
+    // 重点用户
+    private List<Long> importantUsers;
+
+    @PostConstruct
+    public void initialKeyUserIdList() {
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.le("id", 100);
+        List<User> userList = userService.list(queryWrapper);
+        if (CollectionUtils.isEmpty(userList)) {
+            log.error("缓存预热时：用户列表为空");
+        }
+        this.importantUsers = userList.stream().map(User::getId).collect(Collectors.toList());
+    }
 
     /**
      * 用户推荐列表缓存预热
