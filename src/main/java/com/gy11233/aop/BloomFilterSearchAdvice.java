@@ -15,7 +15,7 @@ import javax.annotation.Resource;
 
 
 /**
- * 布隆过滤器搜索通知
+ * 布隆过滤器
  *
  */
 @Component
