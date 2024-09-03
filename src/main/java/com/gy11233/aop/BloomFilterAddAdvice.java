@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 
 /**
- * 布隆过滤器添加通知
+ * 布隆过滤器更新
  */
 @Component
 @Aspect

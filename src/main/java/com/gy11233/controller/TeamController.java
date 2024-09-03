@@ -16,6 +16,7 @@ import com.gy11233.service.TeamService;
 
 import com.gy11233.service.UserService;
 import com.gy11233.service.UserTeamService;
+import org.apache.ibatis.annotations.Param;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
@@ -101,6 +102,23 @@ public class TeamController {
      */
     @GetMapping("/{id}")
     public BaseResponse<Team> getTeam(@PathVariable Long id) {
+        if (id == null || id <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        Team team = teamService.getById(id);
+        if (team == null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "查询失败");
+        }
+        return ResultUtils.success(team);
+    }
+
+    /**
+     * 根据队伍查询搜索信息
+     * @param id
+     * @return
+     */
+    @GetMapping("/get")
+    public BaseResponse<Team> getTeamById(@RequestParam("id") Long id) {
         if (id == null || id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }

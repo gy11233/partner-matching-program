@@ -129,7 +129,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
 
         // 限流
-        redisLimiterManager.doRateLimiter(userAccount);
+//        redisLimiterManager.doRateLimiter(userAccount);
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_account", userAccount);
         Long userCount = userMapper.selectCount(queryWrapper);
@@ -179,22 +179,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (!updateResult) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "注册失败");
         }
-//        if (!updateResult) {
-//            log.info("{}用户星球编号设置失败", userId);
-//        } else {
-//            Set<String> keys = stringRedisTemplate.keys(RedisConstant.USER_RECOMMEND_KEY + ":*");
-//            for (String key : keys) {
-//                try {
-//                    retryer.call(() -> stringRedisTemplate.delete(key));
-//                } catch (ExecutionException e) {
-//                    log.error("用户注册后删除缓存重试时失败");
-//                    throw new BusinessException(ErrorCode.SYSTEM_ERROR);
-//                } catch (RetryException e) {
-//                    log.error("用户注册后删除缓存达到最大重试次数或超过时间限制");
-//                    throw new BusinessException(ErrorCode.SYSTEM_ERROR);
-//                }
-//            }
-//        }
         return userId;
     }
 
