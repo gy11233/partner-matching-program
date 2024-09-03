@@ -164,7 +164,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "添加失败");
         }
         // 如果用户信息插入数据库，则计算用户坐标信息并存入Redis
-        // todo: 这部分的作用是计算用户的坐标信息并存入redis 但是随着人数的增加可能不现实 后续调研
         Long addToRedisResult = stringRedisTemplate.opsForGeo().add(RedisConstant.USER_GEO_KEY,
                 new Point(user.getLongitude(), user.getDimension()), String.valueOf(user.getId()));
         if (addToRedisResult == null || addToRedisResult <= 0) {
@@ -180,7 +179,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (!updateResult) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "注册失败");
         }
-        // todo: 这一步的意义是？？？ 配合缓存吗
 //        if (!updateResult) {
 //            log.info("{}用户星球编号设置失败", userId);
 //        } else {
@@ -339,20 +337,48 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (originUser == null) {
             userfriendsV0.setDistance(null);
         }
+
         else {
             String redisUserGeoKey = RedisConstant.USER_GEO_KEY;
-            // 计算user距离originUser的距离
-            // todo:是否应该改成数据库操作
-            Distance distance = stringRedisTemplate.opsForGeo().distance(redisUserGeoKey,
-                    String.valueOf(originUser.getId()), String.valueOf(user.getId()),
-                    RedisGeoCommands.DistanceUnit.KILOMETERS);
-            if (distance == null) {
+            List<Point> userPosition = stringRedisTemplate.opsForGeo().position(redisUserGeoKey, String.valueOf(user.getId()));
+            List<Point> originUserPosition = stringRedisTemplate.opsForGeo().position(redisUserGeoKey, String.valueOf(originUser.getId()));
+
+            // 如果用户没有位置信息，不用管缓存直接距离为null
+            if (user.getLongitude()==null || user.getDimension()==null || originUser.getDimension()==null || originUser.getLongitude()==null) {
                 userfriendsV0.setDistance(null);
             }
-            else {
-                userfriendsV0.setDistance(distance.getValue());
 
+            else {
+                if (userPosition==null) { // 更缓存
+                    Long addToRedisResult = stringRedisTemplate.opsForGeo().add(redisUserGeoKey,
+                            new Point(user.getLongitude(), user.getDimension()), String.valueOf(user.getId()));
+                    if (addToRedisResult == null || addToRedisResult <= 0) {
+                        log.error("用户坐标信息存入Redis失败");
+                    }
+                }
+                if (originUserPosition == null) {
+                    Long addToRedisResult = stringRedisTemplate.opsForGeo().add(redisUserGeoKey,
+                            new Point(originUser.getLongitude(), originUser.getDimension()), String.valueOf(originUser.getId()));
+                    if (addToRedisResult == null || addToRedisResult <= 0) {
+                        log.error("当前用户坐标信息存入Redis失败");
+                    }
+                }
+
+                // 计算两者距离
+                Distance distance = stringRedisTemplate.opsForGeo().distance(redisUserGeoKey,
+                        String.valueOf(originUser.getId()), String.valueOf(user.getId()),
+                        RedisGeoCommands.DistanceUnit.KILOMETERS);
+
+                if (distance == null){
+                    log.error("计算两个用户距离失败");
+                    userfriendsV0.setDistance(null);
+                }
+                else {
+                    // 保存
+                    userfriendsV0.setDistance(distance.getValue());
+                }
             }
+
         }
         if (originUser == null) {
             userfriendsV0.setIsFriends(2); // 未登录
@@ -457,9 +483,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
-    // todo:是不是可以把synchronized换成分布式锁？？
     public List<UserFriendsVo> recommendUsers(long pageSize, long pageNum, User user) {
-
 
         // 如果user没有登录 key设置为默认的结果
         String key;
