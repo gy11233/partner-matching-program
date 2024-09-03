@@ -85,5 +85,5 @@ public interface UserService extends IService<User> {
 
     List<UserFriendsVo> searchNearby(int radius, User loginUser);
 
-    public UserFriendsVo getUserFriendsVo(User user, User originUser);
+    UserFriendsVo getUserFriendsVo(User user, User originUser);
 }

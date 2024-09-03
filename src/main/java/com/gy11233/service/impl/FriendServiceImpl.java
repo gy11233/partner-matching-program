@@ -128,6 +128,7 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend>
     @Override
     public List<UserVO> listFriends(Long userId, HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
+        loginUser = userService.getById(loginUser.getId());
         QueryWrapper<Friend> queryWrapper = new QueryWrapper();
         queryWrapper.eq("user_id", userId);
         List<Friend> friendList = friendMapper.selectList(queryWrapper);
@@ -136,35 +137,9 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend>
             return user;
         }).collect(Collectors.toList());
         String redisUserGeoKey = RedisConstant.USER_GEO_KEY;
-        List<UserVO> userVOList = userList.stream().map(user -> {
-            Distance distance = stringRedisTemplate.opsForGeo().distance(redisUserGeoKey,
-                    String.valueOf(loginUser.getId()), String.valueOf(user.getId()),
-                    RedisGeoCommands.DistanceUnit.KILOMETERS);
-            UserVO userVO = new UserVO();
-            userVO.setId(user.getId());
-            userVO.setUsername(user.getUsername());
-            userVO.setUserAccount(user.getUserAccount());
-            userVO.setAvatarUrl(user.getAvatarUrl());
-            userVO.setGender(user.getGender());
-            userVO.setProfile(user.getProfile());
-            userVO.setPhone(user.getPhone());
-            userVO.setEmail(user.getEmail());
-            userVO.setUserStatus(user.getUserStatus());
-            userVO.setCreateTime(user.getCreateTime());
-            userVO.setUpdateTime(user.getUpdateTime());
-            userVO.setUserRole(user.getUserRole());
-            userVO.setPlanetCode(user.getPlanetCode());
-            userVO.setTags(user.getTags());
-
-            userVO.setDistance(distance==null?null:distance.getValue()); // 设置距离值
-            return userVO;
-        }).collect(Collectors.toList());
-//        List<User> userList = new ArrayList<>();
-//        for (Friend friend : friendList) {
-//            long friendId = friend.getFriendId();
-//            User user = userMapper.selectById(friendId);
-//            userList.add(user);
-//        }
+        User finalLoginUser = loginUser;
+        List<UserVO> userVOList = userList.stream().map(user -> userService.getUserVo(user, finalLoginUser)).
+                collect(Collectors.toList());
         return userVOList;
     }
 

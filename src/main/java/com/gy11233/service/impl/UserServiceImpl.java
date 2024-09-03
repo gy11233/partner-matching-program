@@ -296,22 +296,52 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         userVO.setTags(user.getTags());
         if (originUser == null) {
             userVO.setDistance(null);
+            return userVO;
         }
+        originUser = this.getById(originUser.getId());
+
+        String redisUserGeoKey = RedisConstant.USER_GEO_KEY;
+        List<Point> userPosition = stringRedisTemplate.opsForGeo().position(redisUserGeoKey, String.valueOf(user.getId()));
+        List<Point> originUserPosition = stringRedisTemplate.opsForGeo().position(redisUserGeoKey, String.valueOf(originUser.getId()));
+
+        // 如果用户没有位置信息，不用管缓存直接距离为null
+        if (user.getLongitude()==null || user.getDimension()==null || originUser.getDimension()==null || originUser.getLongitude()==null) {
+            userVO.setDistance(null);
+        }
+
         else {
-            String redisUserGeoKey = RedisConstant.USER_GEO_KEY;
-            // 计算user距离originUser的距离
-            // todo:是否应该改成数据库操作
+
+            if (userPosition == null || userPosition.get(0)==null) { // 更缓存
+                Long addToRedisResult = stringRedisTemplate.opsForGeo().add(redisUserGeoKey,
+                        new Point(user.getLongitude(), user.getDimension()), String.valueOf(user.getId()));
+                if (addToRedisResult == null || addToRedisResult <= 0) {
+                    log.error("用户坐标信息存入Redis失败");
+                }
+            }
+            if (originUserPosition == null ||originUserPosition.get(0) == null) {
+                Long addToRedisResult = stringRedisTemplate.opsForGeo().add(redisUserGeoKey,
+                        new Point(originUser.getLongitude(), originUser.getDimension()), String.valueOf(originUser.getId()));
+                if (addToRedisResult == null || addToRedisResult <= 0) {
+                    log.error("当前用户坐标信息存入Redis失败");
+                }
+            }
+
+            // 计算两者距离
             Distance distance = stringRedisTemplate.opsForGeo().distance(redisUserGeoKey,
                     String.valueOf(originUser.getId()), String.valueOf(user.getId()),
                     RedisGeoCommands.DistanceUnit.KILOMETERS);
-            if (distance == null) {
+
+            if (distance == null){
+                log.error("计算两个用户距离失败");
                 userVO.setDistance(null);
             }
             else {
+                // 保存
                 userVO.setDistance(distance.getValue());
-
             }
         }
+
+
 
         return userVO;
     }
@@ -349,14 +379,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             }
 
             else {
-                if (userPosition==null) { // 更缓存
+
+                if (userPosition == null || userPosition.get(0)==null) { // 更缓存
                     Long addToRedisResult = stringRedisTemplate.opsForGeo().add(redisUserGeoKey,
                             new Point(user.getLongitude(), user.getDimension()), String.valueOf(user.getId()));
                     if (addToRedisResult == null || addToRedisResult <= 0) {
                         log.error("用户坐标信息存入Redis失败");
                     }
                 }
-                if (originUserPosition == null) {
+                if (originUserPosition == null ||originUserPosition.get(0) == null) {
                     Long addToRedisResult = stringRedisTemplate.opsForGeo().add(redisUserGeoKey,
                             new Point(originUser.getLongitude(), originUser.getDimension()), String.valueOf(originUser.getId()));
                     if (addToRedisResult == null || addToRedisResult <= 0) {
@@ -505,6 +536,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             if (userOld == null) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR);
             }
+            user = userOld; // 用完整的user信息 方便之后查询距离
             key = RedisConstant.USER_RECOMMEND_KEY + ":" + user.getId();
             lock = redissonClient.getLock(RedisConstant.USER_RECOMMEND_LOCK + ":" + user.getId());
 
@@ -533,8 +565,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                     Page<User> page = this.page(new Page<>(pageNum, pageSize), queryWrapper);
                     List<User> userList = page.getRecords();
                     // 将User转换为UserVO，在进行序列化
+                    User finalUser = user;
                     List<UserFriendsVo> userFriendV0 = userList.stream()
-                            .map(user1 -> getUserFriendsVo(user1, user))
+                            .map(user1 -> getUserFriendsVo(user1, finalUser))
                             .collect(Collectors.toList());
                     // 将序列化的 List 写入缓存
                     List<String> userVOJsonList = userFriendV0.stream().map(JSONUtil::toJsonStr).collect(Collectors.toList());
@@ -590,6 +623,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Override
     public List<UserFriendsVo> matchUsers(int num, User loginUser) {
+        loginUser = this.getById(loginUser.getId());
         // 距离阈值 推荐用户需要小于此阈值
         final int distanceThreshold = 4;
         final int numThreshold = 10000;
@@ -694,9 +728,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 1, 3, 2
         // User1、User2、User3
         // 1 => User1, 2 => User2, 3 => User3
+        User finalLoginUser = loginUser;
         Map<Long, List<UserFriendsVo>> userIdUserListMap = this.list(userQueryWrapper)
                 .stream()
-                .map(user -> getUserFriendsVo(user, loginUser))
+                .map(user -> getUserFriendsVo(user, finalLoginUser))
                 .collect(Collectors.groupingBy(UserFriendsVo::getId));
         List<UserFriendsVo> finalUserList = new ArrayList<>();
         // 安装匹配度顺序返回
