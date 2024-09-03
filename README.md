@@ -9,7 +9,7 @@
 
 账号:admin
 
-密码:123456
+密码:12345678
 
 ## 技术选型
 | **技术**         | **用途**                         | **版本** |
@@ -18,7 +18,7 @@
 | JDK            | Java开发工具包                      | 1.8    |
 | MyBatis        | 持久层框架，用于简化数据库操作的ORM框架          | 3.5.2  |
 | MyBatis-Plus   | 基于MyBatis的增强框架，提供了CRUD、代码生成等功能 | 3.5.2  |
-| MySQL          | 关系型数据库                         | 8.x    |
+| MySQL          | 关系型数据库                         | 8.0.37 |
 | Redis          | 非关系型数据库                        | 7.2.5  |
 | WebSocket      | 双向通讯协议，用于实现好友聊天功能              | 2.4.1  |
 | JUnit          | Java的单元测试框架，用于编写和执行自动化测试       | 4.13.2 |
@@ -41,19 +41,46 @@
 ## 功能展示
 登录
 
+![img.png](image/login.png)
+
 注册
+
+![img.png](image/register.png)
 
 推荐页面
 
+![img.png](image/index.png)
+
+![img.png](image/match.png)
+
 按标签匹配
+
+![img.png](image/searchByTags.png)
+
+![img.png](image/searchResult.png)
 
 按距离搜索
 
+![img.png](image/searchNearby.png)
+
 添加好友
+
+![img.png](image/addFriends.png)
+
+![img.png](image/addFriends2.png)
 
 好友聊天
 
+![img.png](image/chat.png)
+
 建立队伍
+
+![img.png](image/team.png)
+
+![img.png](image/addTeam.png)
 
 更改个人信息
 
+![img.png](image/userInfo.png)
+
+![img.png](image/updateUserInfo.png)
