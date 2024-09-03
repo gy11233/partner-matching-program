@@ -39,47 +39,47 @@
 10. 编写Dockerfile，依托云服务器实现镜像构建、容器部署。
 
 ## 功能展示
-登录
+### 登录
 
 ![img.png](image/login.png)
 
-注册
+### 注册
 
 ![img.png](image/register.png)
 
-推荐页面
+### 推荐页面
 
 ![img.png](image/index.png)
 
 ![img.png](image/match.png)
 
-按标签匹配
+### 按标签匹配
 
 ![img.png](image/searchByTags.png)
 
 ![img.png](image/searchResult.png)
 
-按距离搜索
+### 按距离搜索
 
 ![img.png](image/searchNearby.png)
 
-添加好友
+### 添加好友
 
 ![img.png](image/addFriends.png)
 
 ![img.png](image/addFriends2.png)
 
-好友聊天
+### 好友聊天
 
 ![img.png](image/chat.png)
 
-建立队伍
+### 建立队伍
 
 ![img.png](image/team.png)
 
 ![img.png](image/addTeam.png)
 
-更改个人信息
+### 更改个人信息
 
 ![img.png](image/userInfo.png)
 
