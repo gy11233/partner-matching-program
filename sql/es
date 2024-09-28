@@ -1,0 +1,25 @@
+PUT /es_user
+{
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "long"
+      },
+      "name": {
+        "type": "text"
+      },
+      "tags": {
+        "type": "keyword"
+      },
+      "desc": {
+        "type": "text",
+        "analyzer": "ik_max_word"
+      },
+      "location": {
+        "type": "geo_point"
+      }
+    }
+  }
+}
+
+GET es_user

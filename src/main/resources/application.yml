@@ -24,6 +24,11 @@ spring:
     redissonDB: 1
     host: 127.0.0.1
     password : 123456
+  elasticsearch:
+    uris: http://localhost:9200
+#    username: elastic
+#    password: changeme
+
 server:
   port: 8080
   servlet:
