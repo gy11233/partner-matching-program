@@ -2,6 +2,7 @@ package com.gy11233.es;
 
 import com.gy11233.model.domain.ESUser;
 import com.gy11233.model.vo.ESUserLocationSearchVO;
+import com.gy11233.model.vo.UserNearbyVO;
 import com.gy11233.service.EsService;
 import com.gy11233.utils.RandomCodeUtil;
 import org.junit.Test;
@@ -79,9 +80,9 @@ public class ImportDataTest {
         esUserLocationSearchVO.setLat(30.30);
         esUserLocationSearchVO.setLon(120.04);
         esUserLocationSearchVO.setDistance(100000);
-        List<ESUser> esUsers = esService.queryNearBy(esUserLocationSearchVO);
+        List<UserNearbyVO> esUsers = esService.queryNearBy(esUserLocationSearchVO);
 
-        for (ESUser esUser: esUsers) {
+        for (UserNearbyVO esUser: esUsers) {
             System.out.println("esUser = " + esUser.toString());
         }
     }

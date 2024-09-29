@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.gy11233.common.PageRequest;
 import com.gy11233.contant.RedisConstant;
 import com.gy11233.mannger.RateLimiter;
 import com.gy11233.model.domain.Friend;
@@ -13,34 +12,33 @@ import com.gy11233.model.domain.User;
 import com.gy11233.common.ErrorCode;
 import com.gy11233.exception.BusinessException;
 import com.gy11233.model.request.UserRegisterRequest;
+import com.gy11233.model.vo.ESUserLocationSearchVO;
 import com.gy11233.model.vo.UserFriendsVo;
+import com.gy11233.model.vo.UserNearbyVO;
 import com.gy11233.model.vo.UserVO;
+import com.gy11233.service.EsService;
 import com.gy11233.service.FriendService;
 import com.gy11233.service.UserService;
 import com.gy11233.mapper.UserMapper;
 import com.gy11233.utils.AlgorithmUtils;
+import com.gy11233.utils.DistanceUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.math3.util.Pair;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.beans.BeanUtils;
 import org.springframework.data.geo.*;
 import org.springframework.data.redis.connection.RedisGeoCommands;
-import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 
 import com.github.rholder.retry.Retryer;
-import com.github.rholder.retry.RetryException;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -49,7 +47,6 @@ import static com.gy11233.contant.UserConstant.ADMIN_ROLE;
 import static com.gy11233.contant.UserConstant.USER_LOGIN_STATE;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.redisson.api.RLock;
 
 /**
  * 用户服务实现类
@@ -80,6 +77,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Resource
     private RedissonClient redissonClient;
+
+    @Resource
+    EsService esService;
 
     /**
      * 盐值，混淆密码
@@ -181,6 +181,107 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
         return userId;
     }
+
+    /**
+     * 使用es进行地理位置存储
+     */
+    @Override
+    public long userRegisterEs(UserRegisterRequest userRegisterRequest) {
+        String userAccount = userRegisterRequest.getUserAccount();
+        String userPassword = userRegisterRequest.getUserPassword();
+        String checkPassword = userRegisterRequest.getCheckPassword();
+        List<String> tagNameList = userRegisterRequest.getTagNameList();
+        String username = userRegisterRequest.getUsername();
+        Double longitude = userRegisterRequest.getLongitude();
+        Double dimension = userRegisterRequest.getDimension();
+        String phone = userRegisterRequest.getPhone();
+        String avatarUrl = userRegisterRequest.getAvatarUrl();
+        Integer gender = userRegisterRequest.getGender();
+
+        //1.校验
+        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号或密码为空");
+        }
+        if (userAccount.length() < 4) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户账号过短，至少要4位");
+        }
+        if (userPassword.length() < 8 || checkPassword.length() < 8) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码过短，至少要8位");
+        }
+        if (CollectionUtils.isEmpty(tagNameList)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请至少选择一个标签");
+        }
+        if (StringUtils.isBlank(username) || username.length() > 10) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "昵称不合法，长度不得超过 10");
+        }
+        if (longitude == null || longitude > 180 || longitude < -180) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "坐标经度不合法");
+        }
+        if (dimension == null || dimension > 90 || dimension < -90) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "坐标维度不合法");
+        }
+
+
+        // 限流
+//        redisLimiterManager.doRateLimiter(userAccount);
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("user_account", userAccount);
+        Long userCount = userMapper.selectCount(queryWrapper);
+        if (userCount > 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号已存在");
+        }
+        //2.加密
+        String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
+        //3.插入数据
+        User user = new User();
+        user.setUserAccount(userAccount);
+        user.setUserPassword(encryptPassword);
+        user.setLongitude(longitude);
+        user.setDimension(dimension);
+        user.setUsername(username);
+        user.setGender(gender);
+        user.setAvatarUrl(avatarUrl);
+        user.setPhone(phone);
+        // 处理用户标签
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append('[');
+        for (int i = 0; i < tagNameList.size(); i++) {
+            stringBuilder.append('"').append(tagNameList.get(i)).append('"');
+            if (i < tagNameList.size() - 1) {
+                stringBuilder.append(',');
+            }
+        }
+        stringBuilder.append(']');
+        user.setTags(stringBuilder.toString());
+        boolean saveResult = this.save(user);
+        if (!saveResult) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "添加失败");
+        }
+        // 如果用户信息插入数据库，则计算用户坐标信息并存入es
+//        Long addToRedisResult = stringRedisTemplate.opsForGeo().add(RedisConstant.USER_GEO_KEY,
+//                new Point(user.getLongitude(), user.getDimension()), String.valueOf(user.getId()));
+//        if (addToRedisResult == null || addToRedisResult <= 0) {
+//            log.error("用户注册时坐标信息存入Redis失败");
+//        }
+        Boolean b = esService.saveUser(user);
+        if (!b) {
+            log.error("用户注册时es插入数据异常");
+        }
+
+        // 统一设置星球编号 不让用户自己定义
+        long userId = user.getId();
+        User updateUser = new User();
+        updateUser.setId(userId);
+        updateUser.setPlanetCode(String.valueOf(userId));
+        boolean updateResult = this.updateById(updateUser);
+        // 用户注册后对标签进行缓存
+        if (!updateResult) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "注册失败");
+        }
+        return userId;
+    }
+
+
 
 
     /**
@@ -330,89 +431,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return userVO;
     }
 
-    public UserFriendsVo getUserFriendsVo(User user, User originUser) {
-        if (user == null) {
-            return null;
-        }
-        UserFriendsVo userfriendsV0 = new UserFriendsVo();
-        userfriendsV0.setId(user.getId());
-        userfriendsV0.setUsername(user.getUsername());
-        userfriendsV0.setUserAccount(user.getUserAccount());
-        userfriendsV0.setAvatarUrl(user.getAvatarUrl());
-        userfriendsV0.setGender(user.getGender());
-        userfriendsV0.setPhone(user.getPhone());
-        userfriendsV0.setEmail(user.getEmail());
-        userfriendsV0.setUserStatus(user.getUserStatus());
-        userfriendsV0.setCreateTime(user.getCreateTime());
-        userfriendsV0.setUpdateTime(user.getUpdateTime());
-        userfriendsV0.setUserRole(user.getUserRole());
-        userfriendsV0.setPlanetCode(user.getPlanetCode());
-        userfriendsV0.setTags(user.getTags());
-        if (originUser == null) {
-            userfriendsV0.setDistance(null);
-        }
-
-        else {
-            String redisUserGeoKey = RedisConstant.USER_GEO_KEY;
-            List<Point> userPosition = stringRedisTemplate.opsForGeo().position(redisUserGeoKey, String.valueOf(user.getId()));
-            List<Point> originUserPosition = stringRedisTemplate.opsForGeo().position(redisUserGeoKey, String.valueOf(originUser.getId()));
-
-            // 如果用户没有位置信息，不用管缓存直接距离为null
-            if (user.getLongitude()==null || user.getDimension()==null || originUser.getDimension()==null || originUser.getLongitude()==null) {
-                userfriendsV0.setDistance(null);
-            }
-
-            else {
-
-                if (userPosition == null || userPosition.get(0)==null) { // 更缓存
-                    Long addToRedisResult = stringRedisTemplate.opsForGeo().add(redisUserGeoKey,
-                            new Point(user.getLongitude(), user.getDimension()), String.valueOf(user.getId()));
-                    if (addToRedisResult == null || addToRedisResult <= 0) {
-                        log.error("用户坐标信息存入Redis失败");
-                    }
-                }
-                if (originUserPosition == null ||originUserPosition.get(0) == null) {
-                    Long addToRedisResult = stringRedisTemplate.opsForGeo().add(redisUserGeoKey,
-                            new Point(originUser.getLongitude(), originUser.getDimension()), String.valueOf(originUser.getId()));
-                    if (addToRedisResult == null || addToRedisResult <= 0) {
-                        log.error("当前用户坐标信息存入Redis失败");
-                    }
-                }
-
-                // 计算两者距离
-                Distance distance = stringRedisTemplate.opsForGeo().distance(redisUserGeoKey,
-                        String.valueOf(originUser.getId()), String.valueOf(user.getId()),
-                        RedisGeoCommands.DistanceUnit.KILOMETERS);
-
-                if (distance == null){
-                    log.error("计算两个用户距离失败");
-                    userfriendsV0.setDistance(null);
-                }
-                else {
-                    // 保存
-                    userfriendsV0.setDistance(distance.getValue());
-                }
-            }
-
-        }
-        if (originUser == null) {
-            userfriendsV0.setIsFriends(2); // 未登录
-            return userfriendsV0;
-        }
-        QueryWrapper<Friend> friendQueryWrapper = new QueryWrapper<>();
-        friendQueryWrapper.eq("user_id", originUser.getId());
-        friendQueryWrapper.eq("friend_id", user.getId());
-        List<Friend> list = friendService.list(friendQueryWrapper);
-        if (CollectionUtils.isEmpty(list)) {
-            userfriendsV0.setIsFriends(0); // 不是好友
-        }
-        else {
-            userfriendsV0.setIsFriends(1); // 是好友
-        }
-        return userfriendsV0;
-    }
-
-    /**
+       /**
      * 用户注销
      *
      * @param request
@@ -551,7 +570,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                     // 将User转换为UserVO，在进行序列化
                     User finalUser = user;
                     List<UserFriendsVo> userFriendV0 = userList.stream()
-                            .map(user1 -> getUserFriendsVo(user1, finalUser))
+                            .map(user1 -> getUserFriendsVoES(user1, finalUser))
+//                            .map(user1 -> getUserFriendsVo(user1, finalUser))
                             .collect(Collectors.toList());
                     // 将序列化的 List 写入缓存
                     List<String> userVOJsonList = userFriendV0.stream().map(JSONUtil::toJsonStr).collect(Collectors.toList());
@@ -715,7 +735,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         User finalLoginUser = loginUser;
         Map<Long, List<UserFriendsVo>> userIdUserListMap = this.list(userQueryWrapper)
                 .stream()
-                .map(user -> getUserFriendsVo(user, finalLoginUser))
+                .map(user -> getUserFriendsVoES(user, finalLoginUser))
+//                .map(user -> getUserFriendsVo(user, finalLoginUser))
                 .collect(Collectors.groupingBy(UserFriendsVo::getId));
         List<UserFriendsVo> finalUserList = new ArrayList<>();
         // 安装匹配度顺序返回
@@ -756,10 +777,28 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 //                    Distance distance = stringRedisTemplate.opsForGeo().distance(geoKey, userId, String.valueOf(id),
 //                            RedisGeoCommands.DistanceUnit.KILOMETERS);
 //                    userVO.setDistance(distance.getValue());
-                    return getUserFriendsVo(user, loginUser);
+                    return getUserFriendsVoES(user, loginUser);
                 }
         ).collect(Collectors.toList());
         return userVOList.stream().filter(userFriendsVo -> userFriendsVo.getDistance()!=null).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<UserFriendsVo> searchNearbyEs(int radius, User loginUser) {
+        ESUserLocationSearchVO esUserLocationSearchVO = new ESUserLocationSearchVO();
+        esUserLocationSearchVO.setLat(loginUser.getDimension());
+        esUserLocationSearchVO.setLon(loginUser.getLongitude());
+        esUserLocationSearchVO.setDistance(radius);
+        List<UserNearbyVO> userNearbyVOS = esService.queryNearBy(esUserLocationSearchVO);
+        long userId = loginUser.getId();
+        // 把自己排除掉
+        userNearbyVOS = userNearbyVOS.stream().filter(userNearbyVO -> userNearbyVO.getId() != userId).collect(Collectors.toList());
+        // 根据id从数据库中找到完整信息
+        return userNearbyVOS.stream().map(userNearbyVO -> {
+            User user = this.getById(userNearbyVO.getId());
+            return getUserFriendsVoES(user, loginUser, userNearbyVO.getDistance());
+        }).collect(Collectors.toList());
+
     }
 
     private static UserVO transferToUserVO(String userVOJson) {
@@ -768,6 +807,205 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     private static UserFriendsVo transferToUserFriendsVO(String userVOJson) {
         return JSONUtil.toBean(userVOJson, UserFriendsVo.class);
+    }
+
+    /**
+     * 原版的找两个用户之间是否是好友的关系
+     * @param user
+     * @param originUser
+     * @return
+     */
+    public UserFriendsVo getUserFriendsVo(User user, User originUser) {
+        if (user == null) {
+            return null;
+        }
+        UserFriendsVo userfriendsV0 = new UserFriendsVo();
+        userfriendsV0.setId(user.getId());
+        userfriendsV0.setUsername(user.getUsername());
+        userfriendsV0.setUserAccount(user.getUserAccount());
+        userfriendsV0.setAvatarUrl(user.getAvatarUrl());
+        userfriendsV0.setGender(user.getGender());
+        userfriendsV0.setPhone(user.getPhone());
+        userfriendsV0.setEmail(user.getEmail());
+        userfriendsV0.setUserStatus(user.getUserStatus());
+        userfriendsV0.setCreateTime(user.getCreateTime());
+        userfriendsV0.setUpdateTime(user.getUpdateTime());
+        userfriendsV0.setUserRole(user.getUserRole());
+        userfriendsV0.setPlanetCode(user.getPlanetCode());
+        userfriendsV0.setTags(user.getTags());
+        if (originUser == null) {
+            userfriendsV0.setDistance(null);
+        }
+
+        else {
+            String redisUserGeoKey = RedisConstant.USER_GEO_KEY;
+            List<Point> userPosition = stringRedisTemplate.opsForGeo().position(redisUserGeoKey, String.valueOf(user.getId()));
+            List<Point> originUserPosition = stringRedisTemplate.opsForGeo().position(redisUserGeoKey, String.valueOf(originUser.getId()));
+
+            // 如果用户没有位置信息，不用管缓存直接距离为null
+            if (user.getLongitude()==null || user.getDimension()==null || originUser.getDimension()==null || originUser.getLongitude()==null) {
+                userfriendsV0.setDistance(null);
+            }
+
+            else {
+
+                if (userPosition == null || userPosition.get(0)==null) { // 更缓存
+                    Long addToRedisResult = stringRedisTemplate.opsForGeo().add(redisUserGeoKey,
+                            new Point(user.getLongitude(), user.getDimension()), String.valueOf(user.getId()));
+                    if (addToRedisResult == null || addToRedisResult <= 0) {
+                        log.error("用户坐标信息存入Redis失败");
+                    }
+                }
+                if (originUserPosition == null ||originUserPosition.get(0) == null) {
+                    Long addToRedisResult = stringRedisTemplate.opsForGeo().add(redisUserGeoKey,
+                            new Point(originUser.getLongitude(), originUser.getDimension()), String.valueOf(originUser.getId()));
+                    if (addToRedisResult == null || addToRedisResult <= 0) {
+                        log.error("当前用户坐标信息存入Redis失败");
+                    }
+                }
+
+                // 计算两者距离
+                Distance distance = stringRedisTemplate.opsForGeo().distance(redisUserGeoKey,
+                        String.valueOf(originUser.getId()), String.valueOf(user.getId()),
+                        RedisGeoCommands.DistanceUnit.KILOMETERS);
+
+                if (distance == null){
+                    log.error("计算两个用户距离失败");
+                    userfriendsV0.setDistance(null);
+                }
+                else {
+                    // 保存
+                    userfriendsV0.setDistance(distance.getValue());
+                }
+            }
+
+        }
+        if (originUser == null) {
+            userfriendsV0.setIsFriends(2); // 未登录
+            return userfriendsV0;
+        }
+        QueryWrapper<Friend> friendQueryWrapper = new QueryWrapper<>();
+        friendQueryWrapper.eq("user_id", originUser.getId());
+        friendQueryWrapper.eq("friend_id", user.getId());
+        List<Friend> list = friendService.list(friendQueryWrapper);
+        if (CollectionUtils.isEmpty(list)) {
+            userfriendsV0.setIsFriends(0); // 不是好友
+        }
+        else {
+            userfriendsV0.setIsFriends(1); // 是好友
+        }
+        return userfriendsV0;
+    }
+
+
+    /**
+     * es版本找两个用户之前是否是好友
+     * @param user
+     * @param originUser
+     * @return
+     */
+    public UserFriendsVo getUserFriendsVoES(User user, User originUser, double distance) {
+        if (user == null) {
+            return null;
+        }
+        UserFriendsVo userfriendsV0 = new UserFriendsVo();
+        userfriendsV0.setId(user.getId());
+        userfriendsV0.setUsername(user.getUsername());
+        userfriendsV0.setUserAccount(user.getUserAccount());
+        userfriendsV0.setAvatarUrl(user.getAvatarUrl());
+        userfriendsV0.setGender(user.getGender());
+        userfriendsV0.setPhone(user.getPhone());
+        userfriendsV0.setEmail(user.getEmail());
+        userfriendsV0.setUserStatus(user.getUserStatus());
+        userfriendsV0.setCreateTime(user.getCreateTime());
+        userfriendsV0.setUpdateTime(user.getUpdateTime());
+        userfriendsV0.setUserRole(user.getUserRole());
+        userfriendsV0.setPlanetCode(user.getPlanetCode());
+        userfriendsV0.setTags(user.getTags());
+        if (originUser == null) {
+            userfriendsV0.setDistance(null);
+        }
+
+        else {
+            userfriendsV0.setDistance(distance);
+        }
+
+        if (originUser == null) {
+            userfriendsV0.setIsFriends(2); // 未登录
+            return userfriendsV0;
+        }
+        QueryWrapper<Friend> friendQueryWrapper = new QueryWrapper<>();
+        friendQueryWrapper.eq("user_id", originUser.getId());
+        friendQueryWrapper.eq("friend_id", user.getId());
+        List<Friend> list = friendService.list(friendQueryWrapper);
+        if (CollectionUtils.isEmpty(list)) {
+            userfriendsV0.setIsFriends(0); // 不是好友
+        }
+        else {
+            userfriendsV0.setIsFriends(1); // 是好友
+        }
+        return userfriendsV0;
+    }
+
+    /**
+     * es版本找两个用户之前是否是好友
+     * @param user
+     * @param originUser
+     * @return
+     */
+    public UserFriendsVo getUserFriendsVoES(User user, User originUser) {
+        if (user == null) {
+            return null;
+        }
+        UserFriendsVo userfriendsV0 = new UserFriendsVo();
+        userfriendsV0.setId(user.getId());
+        userfriendsV0.setUsername(user.getUsername());
+        userfriendsV0.setUserAccount(user.getUserAccount());
+        userfriendsV0.setAvatarUrl(user.getAvatarUrl());
+        userfriendsV0.setGender(user.getGender());
+        userfriendsV0.setPhone(user.getPhone());
+        userfriendsV0.setEmail(user.getEmail());
+        userfriendsV0.setUserStatus(user.getUserStatus());
+        userfriendsV0.setCreateTime(user.getCreateTime());
+        userfriendsV0.setUpdateTime(user.getUpdateTime());
+        userfriendsV0.setUserRole(user.getUserRole());
+        userfriendsV0.setPlanetCode(user.getPlanetCode());
+        userfriendsV0.setTags(user.getTags());
+        if (originUser == null) {
+            userfriendsV0.setDistance(null);
+        }
+
+        else {
+            // 计算两个人之间的距离
+            Double lat1 = user.getDimension();
+            Double lon1 = user.getLongitude();
+            Double lat2 = originUser.getDimension();
+            Double lon2 = originUser.getLongitude();
+
+            if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
+                userfriendsV0.setDistance(null);
+            }
+            else {
+                double distance = DistanceUtil.calculateDistance(lat1, lon1, lat2, lon2);
+                userfriendsV0.setDistance(distance);
+            }
+        }
+
+        if (originUser == null) {
+            userfriendsV0.setIsFriends(2); // 未登录
+            return userfriendsV0;
+        }
+        QueryWrapper<Friend> friendQueryWrapper = new QueryWrapper<>();
+        friendQueryWrapper.eq("user_id", originUser.getId());
+        friendQueryWrapper.eq("friend_id", user.getId());
+        List<Friend> list = friendService.list(friendQueryWrapper);
+        if (CollectionUtils.isEmpty(list)) {
+            userfriendsV0.setIsFriends(0); // 不是好友
+        }
+        else {
+            userfriendsV0.setIsFriends(1); // 是好友
+        }
+        return userfriendsV0;
     }
 
 

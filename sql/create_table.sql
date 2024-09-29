@@ -4,6 +4,15 @@ database if not exists partner;
 use
 partner;
 
+/**
+  仅仅用作 es 测试
+ */
+create
+    database if not exists partner_es;
+
+use
+    partner_es;
+
 drop table user;
 -- 用户表
 create table user
@@ -77,7 +86,7 @@ create table user_team
 
 
 /*好友表*/
-create table partner.friend
+create table friend
 (
     id         bigint auto_increment comment 'id'
         primary key,
@@ -91,7 +100,7 @@ create table partner.friend
 
 
 /*聊天表*/
-CREATE TABLE partner.chat  (
+CREATE TABLE chat  (
    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '聊天记录id',
    `from_id` bigint(20) NOT NULL COMMENT '发送消息id',
    `to_id` bigint(20) NULL DEFAULT NULL COMMENT '接收消息id',

@@ -50,7 +50,8 @@ public class UserController {
         if (userRegisterRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        long result = userService.userRegister(userRegisterRequest);
+//        long result = userService.userRegister(userRegisterRequest);
+        long result = userService.userRegisterEs(userRegisterRequest);
         return ResultUtils.success(result);
     }
 
@@ -136,17 +137,17 @@ public class UserController {
 
     }
 
-    @PostMapping("/delete")
-    public BaseResponse<Boolean> deleteUser(@RequestBody long id, HttpServletRequest request) {
-        if (!userService.isAdmin(request)) {
-            throw new BusinessException(ErrorCode.NO_AUTH);
-        }
-        if (id <= 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        boolean b = userService.removeById(id);
-        return ResultUtils.success(b);
-    }
+//    @PostMapping("/delete")
+//    public BaseResponse<Boolean> deleteUser(@RequestBody long id, HttpServletRequest request) {
+//        if (!userService.isAdmin(request)) {
+//            throw new BusinessException(ErrorCode.NO_AUTH);
+//        }
+//        if (id <= 0) {
+//            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+//        }
+//        boolean b = userService.removeById(id);
+//        return ResultUtils.success(b);
+//    }
 
 
     /**
@@ -223,7 +224,8 @@ public class UserController {
         }
         User user = userService.getLoginUser(request);
         User loginUser = userService.getById(user.getId());
-        List<UserFriendsVo> userVOList = userService.searchNearby(radius, loginUser);
+//        List<UserFriendsVo> userVOList = userService.searchNearby(radius, loginUser);
+        List<UserFriendsVo> userVOList = userService.searchNearbyEs(radius, loginUser);
         return ResultUtils.success(userVOList);
     }
 

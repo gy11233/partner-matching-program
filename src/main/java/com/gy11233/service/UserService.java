@@ -22,6 +22,8 @@ public interface UserService extends IService<User> {
      */
     long userRegister(UserRegisterRequest userRegisterRequest);
 
+    long userRegisterEs(UserRegisterRequest userRegisterRequest);
+
     /**
      * 用户登录
      *
@@ -84,6 +86,9 @@ public interface UserService extends IService<User> {
     List<UserFriendsVo> matchUsers(int num, User loginUser);
 
     List<UserFriendsVo> searchNearby(int radius, User loginUser);
+
+
+    List<UserFriendsVo> searchNearbyEs(int radius, User loginUser);
 
     UserFriendsVo getUserFriendsVo(User user, User originUser);
 }
