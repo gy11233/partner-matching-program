@@ -2,7 +2,6 @@ package com.gy11233.config;
 
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RedissonClient;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -24,14 +23,9 @@ public class BloomFilterConfig {
      */
     @Bean
     public RBloomFilter<Long> userBloomFilter(){
-        //过滤器名称
-        String filterName = "userBloomFilter";
-        // 预期插入数量
-        long expectedInsertions = 10000L;
-        // 错误比率
-        double falseProbability = 0.01;
-        RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(filterName);
-        bloomFilter.tryInit(expectedInsertions, falseProbability);
+
+        RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(USER_BLOOM_FILTER_NAME);
+        bloomFilter.tryInit(EXPECTED_INSERTIONS, FALSE_PROBABILITY);
         return bloomFilter;
     }
 
@@ -41,11 +35,8 @@ public class BloomFilterConfig {
      */
     @Bean
     public RBloomFilter<Long> teamBloomFilter(){
-        //过滤器名称
-        String filterName = "teamBloomFilter";
-
-        RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(filterName);
-        bloomFilter.tryInit(EXPECTEDINSERTIONS, FALSEPROBABILITY);
+        RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(TEAM_BLOOM_FILTER_NAME);
+        bloomFilter.tryInit(EXPECTED_INSERTIONS, FALSE_PROBABILITY);
         return bloomFilter;
     }
 
